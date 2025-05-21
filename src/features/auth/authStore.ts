@@ -2,22 +2,14 @@
 import { defineStore } from 'pinia'
 import axios from '@/api/axios'
 import type { AuthResponse } from '@/types/auth'
-
-export interface UserDto {
-  id: number
-  nickname: string
-  email: string
-  name: string
-  role: string
-  gender: string
-  age: number
-  profileImage?: string
-  bio?: string
-}
+import type { UserDto } from '@/types/UserDto'
+import type { UserDetailDto } from '@/types/UserDetailDto'
+import type { UserUpdateDto } from '@/types/UserUpdateDto'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     user: null as UserDto | null,
+    userDetail: null as UserDetailDto | null,
     accessToken: localStorage.getItem('accessToken') || '',
   }),
   getters: {
@@ -45,6 +37,10 @@ export const useAuthStore = defineStore('auth', {
       name: string
       gender: string
       age: number
+      bio?: string
+      accompanyCode: number
+      residenceSidoCode: number
+      motiveCodes: number[]
     }) {
       await axios.post('/users/signup', payload)
     },
@@ -54,7 +50,12 @@ export const useAuthStore = defineStore('auth', {
       this.user = res.data
     },
 
-    async updateMyInfo(payload: Partial<UserDto>) {
+    async fetchMyDetail() {
+      const res = await axios.get<UserDetailDto>('/users/me')
+      this.userDetail = res.data
+    },
+
+    async updateMyInfo(payload: UserUpdateDto) {
       await axios.put('/users/me', payload)
       if (this.user) {
         this.user = { ...this.user, ...payload }
@@ -69,6 +70,7 @@ export const useAuthStore = defineStore('auth', {
       }
       this.accessToken = ''
       this.user = null
+      this.userDetail = null
       localStorage.removeItem('accessToken')
     },
   },
