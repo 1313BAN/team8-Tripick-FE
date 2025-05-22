@@ -84,12 +84,9 @@ const destinations = ref<Destination[]>([]);
 
 // 필터 변경 핸들러
 const handleFilterChange = async (filterData: FilterData): Promise<void> => {
-  if (filterData.gender) {
-    selectedGender.value = selectedGender.value === filterData.gender ? null : filterData.gender;
-  }
-  if (filterData.age) {
-    selectedAge.value = selectedAge.value === filterData.age ? null : filterData.age;
-  }
+// FilterSection에서 전달받은 값을 그대로 사용
+  selectedGender.value = filterData.gender;
+  selectedAge.value = filterData.age;
 
   await fetchDestinations();
 };

@@ -1,4 +1,5 @@
 import axios, { type AxiosResponse } from 'axios';
+import type { AgeRange } from '@/types/api';
 // API 기본 URL (환경변수나 설정파일에서 관리하는 것을 권장)
 const API_BASE_URL = import.meta.env.VITE_APP_API_URL || 'http://localhost:8080/api';
 
@@ -37,11 +38,6 @@ interface FilterOptions {
   areaCode?: number | null;
   siGunGuCode?: number | null;
   limit?: number;
-}
-
-interface AgeRange {
-  minAge: number;
-  maxAge: number;
 }
 
 // Axios 인스턴스 생성
