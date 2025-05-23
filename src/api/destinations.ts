@@ -1,4 +1,5 @@
 import axios, { type AxiosResponse } from 'axios';
+import instance from '@/api/axios';
 import type { AgeRange } from '@/types/api';
 // API 기본 URL (환경변수나 설정파일에서 관리하는 것을 권장)
 const API_BASE_URL = import.meta.env.VITE_APP_API_URL || 'http://localhost:8080/api';
@@ -84,7 +85,7 @@ apiClient.interceptors.response.use(
  */
 const convertGenderForBackend = (gender?: string | null): string | undefined => {
   if (!gender) return undefined;
-  return gender === 'male' ? '남성' : '여성';
+  return gender === 'male' ? 'MALE' : 'FEMALE';
 };
 
 /**
@@ -114,7 +115,7 @@ const convertAgeGroupToRange = (ageGroup?: string | null): AgeRange => {
  */
 export const getComplexRecommendations = async (
   filters: FilterOptions = {}
-): Promise<SpotRecommendationDTO[]> => {
+  ):Promise<SpotRecommendationDTO[]> => {
   try {
     // 연령대를 나이 범위로 변환
     const ageRange = convertAgeGroupToRange(filters.age);
@@ -159,7 +160,7 @@ export const getComplexRecommendations = async (
  */
 export const fetchPopularDestinations = async (): Promise<SpotRecommendationDTO[]> => {
   try {
-    const response: AxiosResponse<SpotRecommendationDTO[]> = await apiClient.get('/destinations/popular');
+    const response: AxiosResponse<SpotRecommendationDTO[]> = await instance.get('/destinations/popular');
     return response.data;
   } catch (error) {
     console.error('인기 관광지 조회 실패:', error);
@@ -167,55 +168,6 @@ export const fetchPopularDestinations = async (): Promise<SpotRecommendationDTO[
   }
 };
 
-/**
- * TOP 여행지 목록 조회
- * @returns API 응답
- */
-export const fetchTopDestinations = async (): Promise<SpotRecommendationDTO[]> => {
-  try {
-    const response: AxiosResponse<SpotRecommendationDTO[]> = await apiClient.get('/destinations/top');
-    return response.data;
-  } catch (error) {
-    console.error('TOP 여행지 조회 실패:', error);
-    throw error;
-  }
-};
-
-/**
- * 해시태그 기반 관광지 추천
- * @param hashtags - 선택된 해시태그 배열
- * @returns API 응답
- */
-export const getRecommendationsByHashtags = async (
-  hashtags: string[]
-): Promise<SpotRecommendationDTO[]> => {
-  try {
-    const response: AxiosResponse<SpotRecommendationDTO[]> = await apiClient.post('/destinations/recommend', {
-      hashtags
-    });
-    return response.data;
-  } catch (error) {
-    console.error('해시태그 기반 추천 실패:', error);
-    throw error;
-  }
-};
-
-/**
- * 관광지 상세 정보 조회
- * @param destinationId - 관광지 ID
- * @returns API 응답
- */
-export const fetchDestinationDetail = async (
-  destinationId: number
-): Promise<SpotRecommendationDTO> => {
-  try {
-    const response: AxiosResponse<SpotRecommendationDTO> = await apiClient.get(`/destinations/${destinationId}`);
-    return response.data;
-  } catch (error) {
-    console.error('관광지 상세 조회 실패:', error);
-    throw error;
-  }
-};
 
 // 타입 내보내기
 export type {
@@ -228,7 +180,4 @@ export type {
 export default {
   getComplexRecommendations,
   fetchPopularDestinations,
-  fetchTopDestinations,
-  getRecommendationsByHashtags,
-  fetchDestinationDetail,
 };

@@ -9,9 +9,9 @@
       <div>
         <h3 class="font-medium text-lg">{{ destination.title }}</h3>
         <div class="flex gap-2 mt-1 flex-wrap">
-          <span 
-            v-for="(tag, index) in destination.tags" 
-            :key="index" 
+          <span
+            v-for="(tag, index) in destination.tags"
+            :key="index"
             class="text-xs bg-gray-700 px-2 py-1 rounded"
           >
             #{{ tag }}

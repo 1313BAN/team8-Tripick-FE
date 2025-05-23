@@ -45,7 +45,7 @@ interface Props {
   selectedAge: string | null;
 }
 
-defineProps<Props>();
+const props = defineProps<Props>();
 
 const emit = defineEmits<{
   filterChange: [filterData: FilterData];
@@ -68,13 +68,13 @@ const ageGroups = [
 const selectGender = (gender: string) => {
   emit('filterChange', {
     gender: gender,
-    age: null
+    age: props.selectedAge
   });
 };
 
 const selectAge = (age: string) => {
   emit('filterChange', {
-    gender: null,
+     gender: props.selectedGender,
     age: age
   });
 };
