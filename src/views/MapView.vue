@@ -76,26 +76,16 @@
         <div class="animate-pulse">관광지 정보를 불러오는 중...</div>
       </div>
 
-      <!-- 검색 결과가 없을 경우 -->
-      <div v-else-if="sortedSpots.length === 0" class="p-4 text-center text-gray-400">
-        <p>검색 결과가 없습니다.</p>
-        <p class="text-sm">다른 지역으로 이동하거나 검색어를 변경해보세요.</p>
-      </div>
 
       <!-- 관광지 목록 -->
       <div v-else class="p-4 space-y-3 text-sm">
-        <div v-for="spot in sortedSpots" :key="spot.no" @click="selectSpot(spot)" class="cursor-pointer transition-transform hover:scale-[1.02]">
+        <div v-for="spot in displaySpots" :key="spot.no" @click="selectSpot(spot)" class="cursor-pointer transition-transform hover:scale-[1.02]">
           <SpotCard
             :title="spot.title"
             :type="getTypeName(spot.contentTypeId)"
             :rating="spot.averageRating"
             :review-count="spot.reviewCount"
           />
-        </div>
-
-        <!-- 더 많은 결과가 있을 경우 -->
-        <div v-if="sortedSpots.length >= 300" class="text-center text-gray-400 mt-2">
-          <p>더 많은 결과를 보려면 지도를 조정하세요</p>
         </div>
       </div>
     </div>
@@ -160,32 +150,26 @@ const isLoadingLocation = ref(false)
 const locationError = ref<string | null>(null)
 const isLoadingSpots = ref(false)
 const isLoadingSpotDetail = ref(false)
-const spots = ref<BasicSpot[]>([])
+const spots = ref<BasicSpot[]>([]) // 지도 범위 내 관광지
+const searchResults = ref<BasicSpot[]>([]) // DB 검색 결과
 const searchKeyword = ref('')
+const isSearching = ref(false) // 검색 중 상태
 const selectedSpot = ref<BasicSpot | null>(null)
 const selectedSpotDetail = ref<DetailSpot | null>(null)
 const currentLocation = ref<{lat: number, lng: number} | null>(null)
+let searchMarkers: kakao.maps.Marker[] = [] // 검색 결과 마커들
 
 // 정렬 옵션 상태
 const sortOption = ref('rating')
 
-// 검색어 필터링된 관광지 목록
-const filteredSpots = computed(() => {
-  if (!searchKeyword.value) return spots.value
 
-  const keyword = searchKeyword.value.toLowerCase()
-  return spots.value.filter(spot =>
-    spot.title.toLowerCase().includes(keyword)
-  )
-})
-
-// 🔥 정렬 기능 추가 - 검색 + 정렬이 모두 적용된 최종 목록
-const sortedSpots = computed(() => {
-  const spotsToSort = [...filteredSpots.value]
+// 🔥 표시할 관광지 목록 결정 (검색 결과 우선, 없으면 지도 범위 내)
+const displaySpots = computed(() => {
+  const spotsToSort = searchKeyword.value ? searchResults.value : spots.value
 
   switch (sortOption.value) {
     case 'rating':
-      return spotsToSort.sort((a, b) => {
+      return [...spotsToSort].sort((a, b) => {
         const ratingA = a.averageRating || 0
         const ratingB = b.averageRating || 0
 
@@ -203,7 +187,7 @@ const sortedSpots = computed(() => {
       })
 
     case 'rating-low':
-      return spotsToSort.sort((a, b) => {
+      return [...spotsToSort].sort((a, b) => {
         const ratingA = a.averageRating || 0
         const ratingB = b.averageRating || 0
 
@@ -221,15 +205,134 @@ const sortedSpots = computed(() => {
       })
 
     case 'reviews':
-      return spotsToSort.sort((a, b) => (b.reviewCount || 0) - (a.reviewCount || 0))
+      return [...spotsToSort].sort((a, b) => (b.reviewCount || 0) - (a.reviewCount || 0))
 
     case 'name':
-      return spotsToSort.sort((a, b) => a.title.localeCompare(b.title, 'ko'))
+      return [...spotsToSort].sort((a, b) => a.title.localeCompare(b.title, 'ko'))
 
     default:
       return spotsToSort
   }
 })
+
+// 🔥 DB에서 검색하는 함수
+async function searchSpotsFromDB(keyword: string, type: number | null = null): Promise<BasicSpot[]> {
+  try {
+    isSearching.value = true
+
+    const params = new URLSearchParams()
+    params.append('keyword', keyword)
+    if (type !== null) {
+      params.append('type', type.toString())
+    }
+
+    const response = await fetch(`/api/spots/search?${params}`)
+
+    if (!response.ok) {
+      throw new Error('검색 요청 실패')
+    }
+
+    const data: BasicSpot[] = await response.json()
+    return data
+  } catch (error) {
+    console.error('검색 오류:', error)
+    return []
+  } finally {
+    isSearching.value = false
+  }
+}
+
+// 🔥 검색 결과 마커들만 제거
+function clearSearchMarkers() {
+  searchMarkers.forEach((marker) => marker.setMap(null))
+  searchMarkers = []
+}
+
+// 🔥 검색 결과를 지도에 표시하는 함수
+function displaySearchResults(spotsData: BasicSpot[]) {
+  clearSearchMarkers()
+
+  if (!spotsData || spotsData.length === 0) {
+    searchResults.value = []
+    return
+  }
+
+  searchResults.value = spotsData
+
+  spotsData.forEach((spot) => {
+    const position = new kakao.maps.LatLng(spot.latitude, spot.longitude)
+    const marker = new kakao.maps.Marker({
+      position,
+      map,
+      title: spot.title,
+      // 검색 결과 마커는 빨간색으로 구분
+      image: new kakao.maps.MarkerImage(
+        'https://t1.daumcdn.net/localimg/localimages/07/2018/pc/img/marker_red.png',
+        new kakao.maps.Size(29, 42)
+      )
+    })
+
+    const ratingDisplay = spot.averageRating > 0
+      ? `⭐ ${spot.averageRating.toFixed(1)} (${spot.reviewCount}개)`
+      : '리뷰 없음'
+
+    const hoverInfo = new kakao.maps.InfoWindow({
+      content: `<div style="padding:5px; font-size:13px;">
+        <strong style="color: #dc2626;">[검색결과] ${spot.title}</strong><br>
+        ${getTypeName(spot.contentTypeId)}<br>
+        ${ratingDisplay}
+      </div>`,
+    })
+
+    const detailInfo = new kakao.maps.InfoWindow({
+      content: `
+        <div style="padding:10px; font-size:14px; max-width:300px;">
+          <strong style="color: #dc2626;">[검색결과] ${spot.title}</strong><br/>
+          타입: ${getTypeName(spot.contentTypeId)}<br/>
+          평점: ${ratingDisplay}<br/>
+          <a href="#" onclick="window.selectSpotById(${spot.no}); return false;" style="color:blue;text-decoration:underline;">상세정보 보기</a>
+        </div>
+      `,
+    })
+
+    kakao.maps.event.addListener(marker, 'mouseover', () => hoverInfo.open(map, marker))
+    kakao.maps.event.addListener(marker, 'mouseout', () => hoverInfo.close())
+    kakao.maps.event.addListener(marker, 'click', () => {
+      if (openDetailInfoWindow) openDetailInfoWindow.close()
+      detailInfo.open(map, marker)
+      openDetailInfoWindow = detailInfo
+      selectSpotBasic(spot)
+    })
+
+    searchMarkers.push(marker)
+  })
+
+  // 검색 결과가 모두 보이도록 지도 범위 조정
+  if (spotsData.length > 0) {
+    adjustMapBounds(spotsData)
+  }
+}
+
+// 🔥 지도 범위를 검색 결과에 맞게 조정
+function adjustMapBounds(spots: BasicSpot[]) {
+  if (spots.length === 0) return
+
+  const bounds = new kakao.maps.LatLngBounds()
+
+  spots.forEach(spot => {
+    bounds.extend(new kakao.maps.LatLng(spot.latitude, spot.longitude))
+  })
+
+  map.setBounds(bounds)
+
+  // 단일 결과인 경우 적절한 줌 레벨 설정
+  if (spots.length === 1) {
+    setTimeout(() => {
+      map.setLevel(5)
+    }, 100)
+  }
+}
+
 
 function startResizing(e: MouseEvent) {
   isResizing = true
@@ -333,7 +436,8 @@ function drawMarkers(spotsData: BasicSpot[]) {
   // 전역 함수로 노출시켜 인포윈도우에서 호출할 수 있게 함
   // @ts-ignore
   window.selectSpotById = async (id: number) => {
-    const spot = spots.value.find(s => s.no === id)
+    const allSpots = [...spots.value, ...searchResults.value]
+    const spot = allSpots.find(s => s.no === id)
     if (spot) {
       await selectSpot(spot)
     }
@@ -395,7 +499,8 @@ function moveToSpot(spot: BasicSpot) {
   map.setLevel(3) // 더 가까이 줌
 
   // 해당 마커의 인포윈도우 열기
-  const marker = markers.find(m =>
+  const allMarkers = [...markers, ...searchMarkers]
+  const marker = allMarkers.find(m =>
     m.getPosition().getLat() === spot.latitude &&
     m.getPosition().getLng() === spot.longitude
   )
@@ -436,27 +541,39 @@ function moveToCurrentLocation() {
 
 // 🔥 검색 핸들러 (디바운스 적용) - 정렬된 목록 기준으로 마커 표시
 let searchTimeout: number | null = null
-function handleSearch() {
+
+// 🔥 handleSearch 함수 완전 변경 (기존 코드 대체)
+async function handleSearch() {
   if (searchTimeout) {
     clearTimeout(searchTimeout)
   }
 
-  searchTimeout = setTimeout(() => {
-    // 검색어가 있으면 필터링된 목록 사용, 없으면 모든 관광지 표시
-    if (!searchKeyword.value) {
-      // 마커 전체 다시 표시
-      markers.forEach(marker => marker.setMap(map))
-    } else {
-      // 검색어로 필터링된 관광지만 마커 표시
-      const filtered = filteredSpots.value
-      markers.forEach(marker => {
-        const isVisible = filtered.some(spot =>
-          spot.title === marker.getTitle()
-        )
-        marker.setMap(isVisible ? map : null)
-      })
+  searchTimeout = setTimeout(async () => {
+    const keyword = searchKeyword.value?.trim()
+
+    // 검색어가 없으면 검색 결과 초기화
+    if (!keyword) {
+      clearSearchMarkers()
+      searchResults.value = []
+      return
     }
-  }, 200)
+
+    // 검색어가 2글자 미만이면 검색하지 않음
+    if (keyword.length < 2) {
+      return
+    }
+
+    try {
+      // DB에서 검색 실행 (현재 선택된 타입 적용)
+      const results = await searchSpotsFromDB(keyword, currentType.value)
+
+      // 검색 결과를 지도에 표시
+      displaySearchResults(results)
+
+    } catch (error) {
+      console.error('검색 처리 오류:', error)
+    }
+  }, 300)
 }
 
 function fetchSpots() {
@@ -491,11 +608,18 @@ function fetchSpots() {
     })
 }
 
+// 🔥 changeType 함수 수정 (기존 코드에 추가)
 function changeType(type: number | null) {
   currentType.value = type
-  selectedSpot.value = null // 상세 정보 닫기
+  selectedSpot.value = null
   selectedSpotDetail.value = null
-  fetchSpots()
+
+  // 타입 변경 시 검색어가 있으면 다시 검색, 없으면 지도 새로고침
+  if (searchKeyword.value?.trim()) {
+    handleSearch() // 새로운 타입으로 다시 검색
+  } else {
+    fetchSpots() // 지도 범위 내 관광지 다시 로드
+  }
 }
 
 // 사용자의 현재 위치를 가져오는 함수
