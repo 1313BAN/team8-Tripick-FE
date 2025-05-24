@@ -6,6 +6,7 @@
       class="bg-gray-900 text-white overflow-y-auto flex flex-col"
       :style="{ width: sidebarWidth + 'px' }"
     >
+      <!-- 검색 헤더 -->
       <div class="p-4 border-b border-gray-700">
         <h2 class="text-2xl font-bold mb-2">관광지 검색</h2>
         <div class="relative">
@@ -52,7 +53,6 @@
           <option value="rating">⭐ 평점 높은 순</option>
           <option value="rating-low">⭐ 평점 낮은 순</option>
           <option value="reviews">💬 리뷰 많은 순</option>
-          <option value="name">🔤 이름 순</option>
         </select>
       </div>
 
@@ -75,7 +75,6 @@
       <div v-else-if="isLoadingSpots" class="p-4 text-center text-gray-400">
         <div class="animate-pulse">관광지 정보를 불러오는 중...</div>
       </div>
-
 
       <!-- 관광지 목록 -->
       <div v-else class="p-4 space-y-3 text-sm">
@@ -112,56 +111,58 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, computed} from 'vue'
+import { onMounted, ref, computed } from 'vue'
 import { onBeforeUnmount } from 'vue'
 import SpotCard from '@/components/SpotCard.vue'
 import SpotDetail from '@/components/SpotDetail.vue'
+import type { BasicSpot, DetailSpot } from '@/types/spot'
+import { typeMap } from '@/constants/SPOTTYPE'
 
-// 기본 관광지 정보 타입
-interface BasicSpot {
-  no: number
-  title: string
-  contentTypeId: number
-  latitude: number
-  longitude: number
-  averageRating: number
-  reviewCount: number
-}
 
-// 상세 관광지 정보 타입
-interface DetailSpot extends BasicSpot {
-  ageRatings: {
-    twenties: number
-    thirties: number
-    forties: number
-    fifties: number
-    sixties: number
-  }
-  mostPopularAccompanyType: string
-  mostPopularMotive: string
-}
+// 상태 관리 (State Management)
 
+// UI 상태
 const sidebarWidth = ref(360) // 사이드바 초기 너비
-let isResizing = false
-
-// 반응형 변수로 선언
 const currentType = ref<number | null>(null)
+const sortOption = ref('rating')
+
+// 로딩 상태
 const isLoadingLocation = ref(false)
-const locationError = ref<string | null>(null)
 const isLoadingSpots = ref(false)
 const isLoadingSpotDetail = ref(false)
+const isSearching = ref(false)
+
+// 에러 상태
+const locationError = ref<string | null>(null)
+
+// 데이터 상태
 const spots = ref<BasicSpot[]>([]) // 지도 범위 내 관광지
 const searchResults = ref<BasicSpot[]>([]) // DB 검색 결과
-const searchKeyword = ref('')
-const isSearching = ref(false) // 검색 중 상태
 const selectedSpot = ref<BasicSpot | null>(null)
 const selectedSpotDetail = ref<DetailSpot | null>(null)
 const currentLocation = ref<{lat: number, lng: number} | null>(null)
+
+// 검색 관련
+const searchKeyword = ref('')
+let searchTimeout: number | null = null
+
+// 지도 관련 변수
+let map: kakao.maps.Map
+let markers: kakao.maps.Marker[] = []
 let searchMarkers: kakao.maps.Marker[] = [] // 검색 결과 마커들
+let openDetailInfoWindow: kakao.maps.InfoWindow | null = null
 
-// 정렬 옵션 상태
-const sortOption = ref('rating')
+// 사이드바 리사이징 관련
+let isResizing = false
 
+// 지도 상수
+const DEFAULT_LAT = 37.5665
+const DEFAULT_LNG = 126.978
+const DEFAULT_LEVEL = 7
+
+// =====================================
+// 🧮 계산된 속성 (Computed Properties)
+// =====================================
 
 // 🔥 표시할 관광지 목록 결정 (검색 결과 우선, 없으면 지도 범위 내)
 const displaySpots = computed(() => {
@@ -207,13 +208,166 @@ const displaySpots = computed(() => {
     case 'reviews':
       return [...spotsToSort].sort((a, b) => (b.reviewCount || 0) - (a.reviewCount || 0))
 
-    case 'name':
-      return [...spotsToSort].sort((a, b) => a.title.localeCompare(b.title, 'ko'))
-
     default:
       return spotsToSort
   }
 })
+
+// =====================================
+// 🚀 초기화 함수들 (Initialization)
+// =====================================
+
+async function initializeMap() {
+  if (typeof kakao === 'undefined') {
+    console.error('❌ Kakao 객체가 없습니다.')
+    return
+  }
+
+  const container = document.getElementById('map')
+  if (!container) {
+    console.error('❌ #map DOM을 찾을 수 없습니다.')
+    return
+  }
+
+  let mapLat = DEFAULT_LAT
+  let mapLng = DEFAULT_LNG
+  let mapLevel = DEFAULT_LEVEL
+
+  // 현재 위치 가져오기 시도
+  isLoadingLocation.value = true
+  locationError.value = null
+
+  try {
+    const location = await getCurrentLocation()
+    mapLat = location.lat
+    mapLng = location.lng
+    mapLevel = 6
+
+    console.log(`✅ 현재 위치: ${mapLat}, ${mapLng}`)
+  } catch (error) {
+    console.warn('현재 위치를 가져올 수 없어서 기본 위치(서울)로 설정합니다:', error)
+    locationError.value = error instanceof Error ? error.message : '위치를 가져올 수 없습니다.'
+
+    // 기본 위치 사용
+    currentLocation.value = {
+      lat: DEFAULT_LAT,
+      lng: DEFAULT_LNG
+    }
+  } finally {
+    isLoadingLocation.value = false
+  }
+
+  // 지도 초기화
+  const mapOption = {
+    center: new kakao.maps.LatLng(mapLat, mapLng),
+    level: mapLevel,
+  }
+
+  map = new kakao.maps.Map(container, mapOption)
+
+  // 현재 위치에 마커 표시 (기본 위치가 아닌 경우에만)
+  if (mapLat !== DEFAULT_LAT || mapLng !== DEFAULT_LNG) {
+    const currentLocationMarker = new kakao.maps.Marker({
+      position: new kakao.maps.LatLng(mapLat, mapLng),
+      map: map,
+      image: new kakao.maps.MarkerImage(
+        'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png',
+        new kakao.maps.Size(24, 35)
+      )
+    })
+
+    const currentLocationInfoWindow = new kakao.maps.InfoWindow({
+      content: '<div style="padding:5px; font-size:13px; color: #0066cc;"><strong>📍 현재 위치</strong></div>'
+    })
+
+    kakao.maps.event.addListener(currentLocationMarker, 'click', () => {
+      currentLocationInfoWindow.open(map, currentLocationMarker)
+    })
+  }
+
+  // 지도 이벤트 리스너 등록
+  kakao.maps.event.addListener(map, 'idle', fetchSpots)
+  fetchSpots()
+}
+
+// 사용자의 현재 위치를 가져오는 함수
+function getCurrentLocation(): Promise<{ lat: number; lng: number }> {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('이 브라우저는 위치 서비스를 지원하지 않습니다.'))
+      return
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const location = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        }
+        currentLocation.value = location // 현재 위치 저장
+        resolve(location)
+      },
+      (error) => {
+        let errorMessage = '위치 정보를 가져올 수 없습니다.'
+
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage = '위치 접근 권한이 거부되었습니다.'
+            break
+          case error.POSITION_UNAVAILABLE:
+            errorMessage = '위치 정보를 사용할 수 없습니다.'
+            break
+          case error.TIMEOUT:
+            errorMessage = '위치 정보 요청 시간이 초과되었습니다.'
+            break
+        }
+
+        reject(new Error(errorMessage))
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 300000
+      }
+    )
+  })
+}
+
+// =====================================
+// 🌐 API 호출 함수들 (API Functions)
+// =====================================
+
+function fetchSpots() {
+  if (!map) return
+
+  const bounds = map.getBounds()
+  const sw = bounds.getSouthWest()
+  const ne = bounds.getNorthEast()
+
+  let url = `/api/spots/in-boundary?swLat=${sw.getLat()}&swLng=${sw.getLng()}&neLat=${ne.getLat()}&neLng=${ne.getLng()}`
+  if (currentType.value !== null) {
+    console.log(currentType.value, "디버깅")
+    url += `&type=${currentType.value}`
+  }
+
+  isLoadingSpots.value = true
+
+  fetch(url)
+    .then((res) => {
+      if (!res.ok) {
+        throw new Error('관광지 데이터를 가져올 수 없습니다.')
+      }
+      return res.json()
+    })
+    .then((data: BasicSpot[]) => {
+      drawMarkers(data)
+      isLoadingSpots.value = false
+    })
+    .catch((err) => {
+      console.error('관광지 데이터 요청 실패:', err)
+      isLoadingSpots.value = false
+    })
+}
 
 // 🔥 DB에서 검색하는 함수
 async function searchSpotsFromDB(keyword: string, type: number | null = null): Promise<BasicSpot[]> {
@@ -242,10 +396,65 @@ async function searchSpotsFromDB(keyword: string, type: number | null = null): P
   }
 }
 
-// 🔥 검색 결과 마커들만 제거
+// =====================================
+// 🗺️ 지도 관련 함수들 (Map Functions)
+// =====================================
+
+function clearMarkers() {
+  markers.forEach((marker) => marker.setMap(null))
+  markers = []
+}
+
 function clearSearchMarkers() {
   searchMarkers.forEach((marker) => marker.setMap(null))
   searchMarkers = []
+}
+
+function drawMarkers(spotsData: BasicSpot[]) {
+  clearMarkers()
+  spots.value = spotsData // 관광지 목록 저장
+
+  spotsData.forEach((spot) => {
+    const position = new kakao.maps.LatLng(spot.latitude, spot.longitude)
+    const marker = new kakao.maps.Marker({ position, map, title: spot.title })
+
+    // 🔥 평점 표시 개선
+    const ratingDisplay = spot.averageRating > 0
+      ? `⭐ ${spot.averageRating.toFixed(1)} (${spot.reviewCount}개)`
+      : ''
+
+    const detailInfo = new kakao.maps.InfoWindow({
+      content: `
+        <div style="padding:15px; font-size:12px; max-width:500px;">
+          <strong>${spot.title}</strong><br/>
+          타입: ${getTypeName(spot.contentTypeId)}<br/>
+          ${ratingDisplay ? `평점: ${ratingDisplay}<br/>` : ''}
+          <a href="#" onclick="window.selectSpotById(${spot.no}); return false;" style="color:blue;text-decoration:underline;">상세정보 보기</a>
+        </div>
+      `,
+    })
+
+    kakao.maps.event.addListener(marker, 'mouseover', () => {
+      if (openDetailInfoWindow) openDetailInfoWindow.close()
+      detailInfo.open(map, marker)
+      openDetailInfoWindow = detailInfo
+
+      // 해당 관광지 선택 (기본 정보만)
+      selectSpotBasic(spot)
+    })
+
+    markers.push(marker)
+  })
+
+  // 전역 함수로 노출시켜 인포윈도우에서 호출할 수 있게 함
+  // @ts-ignore
+  window.selectSpotById = async (id: number) => {
+    const allSpots = [...spots.value, ...searchResults.value]
+    const spot = allSpots.find(s => s.no === id)
+    if (spot) {
+      await selectSpot(spot)
+    }
+  }
 }
 
 // 🔥 검색 결과를 지도에 표시하는 함수
@@ -265,39 +474,24 @@ function displaySearchResults(spotsData: BasicSpot[]) {
       position,
       map,
       title: spot.title,
-      // 검색 결과 마커는 빨간색으로 구분
-      image: new kakao.maps.MarkerImage(
-        'https://t1.daumcdn.net/localimg/localimages/07/2018/pc/img/marker_red.png',
-        new kakao.maps.Size(29, 42)
-      )
     })
 
     const ratingDisplay = spot.averageRating > 0
       ? `⭐ ${spot.averageRating.toFixed(1)} (${spot.reviewCount}개)`
-      : '리뷰 없음'
-
-    const hoverInfo = new kakao.maps.InfoWindow({
-      content: `<div style="padding:5px; font-size:13px;">
-        <strong style="color: #dc2626;">[검색결과] ${spot.title}</strong><br>
-        ${getTypeName(spot.contentTypeId)}<br>
-        ${ratingDisplay}
-      </div>`,
-    })
+      : ''
 
     const detailInfo = new kakao.maps.InfoWindow({
       content: `
-        <div style="padding:10px; font-size:14px; max-width:300px;">
+        <div style="padding:5px; font-size:10px; max-width:350px;">
           <strong style="color: #dc2626;">[검색결과] ${spot.title}</strong><br/>
           타입: ${getTypeName(spot.contentTypeId)}<br/>
-          평점: ${ratingDisplay}<br/>
+          ${ratingDisplay ? `평점: ${ratingDisplay}<br/>` : ''}
           <a href="#" onclick="window.selectSpotById(${spot.no}); return false;" style="color:blue;text-decoration:underline;">상세정보 보기</a>
         </div>
       `,
     })
 
-    kakao.maps.event.addListener(marker, 'mouseover', () => hoverInfo.open(map, marker))
-    kakao.maps.event.addListener(marker, 'mouseout', () => hoverInfo.close())
-    kakao.maps.event.addListener(marker, 'click', () => {
+    kakao.maps.event.addListener(marker, 'mouseover', () => {
       if (openDetailInfoWindow) openDetailInfoWindow.close()
       detailInfo.open(map, marker)
       openDetailInfoWindow = detailInfo
@@ -325,124 +519,103 @@ function adjustMapBounds(spots: BasicSpot[]) {
 
   map.setBounds(bounds)
 
-  // 단일 결과인 경우 적절한 줌 레벨 설정
-  if (spots.length === 1) {
-    setTimeout(() => {
-      map.setLevel(5)
-    }, 100)
-  }
+  // 줌 레벨이 너무 가까워지지 않게 제한
+  setTimeout(() => {
+    const currentLevel = map.getLevel()
+    if (currentLevel < 2) {  // 최소 레벨 5로 제한
+      map.setLevel(2)
+    }
+  }, 100)
 }
 
+// 관광지 위치로 지도 이동
+function moveToSpot(spot: BasicSpot) {
+  const position = new kakao.maps.LatLng(spot.latitude, spot.longitude)
+  map.setCenter(position)
+  map.setLevel(3) // 더 가까이 줌
 
-function startResizing(e: MouseEvent) {
-  isResizing = true
-  document.addEventListener('mousemove', resizeSidebar)
-  document.addEventListener('mouseup', stopResizing)
-}
+  // 해당 마커의 인포윈도우 열기
+  const allMarkers = [...markers, ...searchMarkers]
+  const marker = allMarkers.find(m =>
+    m.getPosition().getLat() === spot.latitude &&
+    m.getPosition().getLng() === spot.longitude
+  )
 
-function resizeSidebar(e: MouseEvent) {
-  if (!isResizing) return
-  const minWidth = 260
-  const maxWidth = 600
-  const newWidth = Math.min(Math.max(e.clientX, minWidth), maxWidth)
-  sidebarWidth.value = newWidth
-}
+  if (marker) {
+    if (openDetailInfoWindow) openDetailInfoWindow.close()
 
-function stopResizing() {
-  isResizing = false
-  document.removeEventListener('mousemove', resizeSidebar)
-  document.removeEventListener('mouseup', stopResizing)
-}
-
-onBeforeUnmount(() => {
-  stopResizing()
-})
-
-let map: kakao.maps.Map
-let markers: kakao.maps.Marker[] = []
-let openDetailInfoWindow: kakao.maps.InfoWindow | null = null
-
-// 기본 위치 (서울)
-const DEFAULT_LAT = 37.5665
-const DEFAULT_LNG = 126.978
-const DEFAULT_LEVEL = 7
-
-const typeMap: Record<number, string> = {
-  1: '자연관광지',
-  2: '역사 시설',
-  3: '공연,영화,전시',
-  4: '상업 스팟',
-  5: '레저, 스포츠',
-  6: '테마시설',
-  7: '걷기 좋은 길',
-  8: '지역 축제',
-}
-
-function getTypeName(typeId: number): string {
-  return typeMap[typeId] || '기타'
-}
-
-function clearMarkers() {
-  markers.forEach((marker) => marker.setMap(null))
-  markers = []
-}
-
-function drawMarkers(spotsData: BasicSpot[]) {
-  clearMarkers()
-  spots.value = spotsData // 관광지 목록 저장
-
-  spotsData.forEach((spot) => {
-    const position = new kakao.maps.LatLng(spot.latitude, spot.longitude)
-    const marker = new kakao.maps.Marker({ position, map, title: spot.title })
-
-    // 🔥 평점 표시 개선
     const ratingDisplay = spot.averageRating > 0
-      ? `⭐ ${spot.averageRating.toFixed(1)} (${spot.reviewCount}개)`
-      : '리뷰 없음'
-
-    const hoverInfo = new kakao.maps.InfoWindow({
-      content: `<div style="padding:5px; font-size:13px;">
-        <strong>${spot.title}</strong><br>
-        ${getTypeName(spot.contentTypeId)}<br>
-        ${ratingDisplay}
-      </div>`,
-    })
+      ? `⭐ ${spot.averageRating.toFixed(1)} (리뷰 ${spot.reviewCount}개)`
+      : ''
 
     const detailInfo = new kakao.maps.InfoWindow({
       content: `
-        <div style="padding:10px; font-size:14px; max-width:300px;">
+        <div style="padding:5px; font-size:12px; max-width:500px;">
           <strong>${spot.title}</strong><br/>
           타입: ${getTypeName(spot.contentTypeId)}<br/>
-          평점: ${ratingDisplay}<br/>
+          ${ratingDisplay ? `평점: ${ratingDisplay}<br/>` : ''}
           <a href="#" onclick="window.selectSpotById(${spot.no}); return false;" style="color:blue;text-decoration:underline;">상세정보 보기</a>
         </div>
       `,
     })
 
-    kakao.maps.event.addListener(marker, 'mouseover', () => hoverInfo.open(map, marker))
-    kakao.maps.event.addListener(marker, 'mouseout', () => hoverInfo.close())
-    kakao.maps.event.addListener(marker, 'click', () => {
-      if (openDetailInfoWindow) openDetailInfoWindow.close()
-      detailInfo.open(map, marker)
-      openDetailInfoWindow = detailInfo
-
-      // 해당 관광지 선택 (기본 정보만)
-      selectSpotBasic(spot)
-    })
-
-    markers.push(marker)
-  })
-
-  // 전역 함수로 노출시켜 인포윈도우에서 호출할 수 있게 함
-  // @ts-ignore
-  window.selectSpotById = async (id: number) => {
-    const allSpots = [...spots.value, ...searchResults.value]
-    const spot = allSpots.find(s => s.no === id)
-    if (spot) {
-      await selectSpot(spot)
-    }
+    detailInfo.open(map, marker)
+    openDetailInfoWindow = detailInfo
   }
 }
+
+// 현재 위치로 이동하는 함수
+function moveToCurrentLocation() {
+  if (currentLocation.value) {
+    const position = new kakao.maps.LatLng(currentLocation.value.lat, currentLocation.value.lng)
+    map.setCenter(position)
+    map.setLevel(4)
+  } else {
+    alert('위치 정보를 가져올 수 없습니다.')
+  }
+}
+
+// =====================================
+// 🔍 검색 관련 함수들 (Search Functions)
+// =====================================
+
+// 🔥 검색 핸들러 (디바운스 적용) - 정렬된 목록 기준으로 마커 표시
+async function handleSearch() {
+  if (searchTimeout) {
+    clearTimeout(searchTimeout)
+  }
+
+  searchTimeout = setTimeout(async () => {
+    const keyword = searchKeyword.value?.trim()
+
+    // 검색어가 없으면 검색 결과 초기화
+    if (!keyword) {
+      clearSearchMarkers()
+      searchResults.value = []
+      return
+    }
+
+    // 검색어가 2글자 미만이면 검색하지 않음
+    if (keyword.length < 2) {
+      return
+    }
+
+    try {
+      // DB에서 검색 실행 (현재 선택된 타입 적용)
+      const results = await searchSpotsFromDB(keyword, currentType.value)
+
+      // 검색 결과를 지도에 표시
+      displaySearchResults(results)
+
+    } catch (error) {
+      console.error('검색 처리 오류:', error)
+    }
+  }, 300)
+}
+
+// =====================================
+// 🎮 UI 이벤트 핸들러들 (Event Handlers)
+// =====================================
 
 // 기본 관광지 선택 (상세 정보 로드하지 않음)
 function selectSpotBasic(spot: BasicSpot) {
@@ -492,122 +665,6 @@ function closeSpotDetail() {
   selectedSpotDetail.value = null
 }
 
-// 관광지 위치로 지도 이동
-function moveToSpot(spot: BasicSpot) {
-  const position = new kakao.maps.LatLng(spot.latitude, spot.longitude)
-  map.setCenter(position)
-  map.setLevel(3) // 더 가까이 줌
-
-  // 해당 마커의 인포윈도우 열기
-  const allMarkers = [...markers, ...searchMarkers]
-  const marker = allMarkers.find(m =>
-    m.getPosition().getLat() === spot.latitude &&
-    m.getPosition().getLng() === spot.longitude
-  )
-
-  if (marker) {
-    if (openDetailInfoWindow) openDetailInfoWindow.close()
-
-    const ratingDisplay = spot.averageRating > 0
-      ? `⭐ ${spot.averageRating.toFixed(1)} (리뷰 ${spot.reviewCount}개)`
-      : '리뷰 없음'
-
-    const detailInfo = new kakao.maps.InfoWindow({
-      content: `
-        <div style="padding:10px; font-size:14px; max-width:300px;">
-          <strong>${spot.title}</strong><br/>
-          타입: ${getTypeName(spot.contentTypeId)}<br/>
-          평점: ${ratingDisplay}<br/>
-          <a href="#" onclick="window.selectSpotById(${spot.no}); return false;" style="color:blue;text-decoration:underline;">상세정보 보기</a>
-        </div>
-      `,
-    })
-
-    detailInfo.open(map, marker)
-    openDetailInfoWindow = detailInfo
-  }
-}
-
-// 현재 위치로 이동하는 함수
-function moveToCurrentLocation() {
-  if (currentLocation.value) {
-    const position = new kakao.maps.LatLng(currentLocation.value.lat, currentLocation.value.lng)
-    map.setCenter(position)
-    map.setLevel(4)
-  } else {
-    alert('위치 정보를 가져올 수 없습니다.')
-  }
-}
-
-// 🔥 검색 핸들러 (디바운스 적용) - 정렬된 목록 기준으로 마커 표시
-let searchTimeout: number | null = null
-
-// 🔥 handleSearch 함수 완전 변경 (기존 코드 대체)
-async function handleSearch() {
-  if (searchTimeout) {
-    clearTimeout(searchTimeout)
-  }
-
-  searchTimeout = setTimeout(async () => {
-    const keyword = searchKeyword.value?.trim()
-
-    // 검색어가 없으면 검색 결과 초기화
-    if (!keyword) {
-      clearSearchMarkers()
-      searchResults.value = []
-      return
-    }
-
-    // 검색어가 2글자 미만이면 검색하지 않음
-    if (keyword.length < 2) {
-      return
-    }
-
-    try {
-      // DB에서 검색 실행 (현재 선택된 타입 적용)
-      const results = await searchSpotsFromDB(keyword, currentType.value)
-
-      // 검색 결과를 지도에 표시
-      displaySearchResults(results)
-
-    } catch (error) {
-      console.error('검색 처리 오류:', error)
-    }
-  }, 300)
-}
-
-function fetchSpots() {
-  if (!map) return
-
-  const bounds = map.getBounds()
-  const sw = bounds.getSouthWest()
-  const ne = bounds.getNorthEast()
-
-  let url = `/api/spots/in-boundary?swLat=${sw.getLat()}&swLng=${sw.getLng()}&neLat=${ne.getLat()}&neLng=${ne.getLng()}`
-  if (currentType.value !== null) {
-    console.log(currentType.value, "디버깅")
-    url += `&type=${currentType.value}`
-  }
-
-  isLoadingSpots.value = true
-
-  fetch(url)
-    .then((res) => {
-      if (!res.ok) {
-        throw new Error('관광지 데이터를 가져올 수 없습니다.')
-      }
-      return res.json()
-    })
-    .then((data: BasicSpot[]) => {
-      drawMarkers(data)
-      isLoadingSpots.value = false
-    })
-    .catch((err) => {
-      console.error('관광지 데이터 요청 실패:', err)
-      isLoadingSpots.value = false
-    })
-}
-
 // 🔥 changeType 함수 수정 (기존 코드에 추가)
 function changeType(type: number | null) {
   currentType.value = type
@@ -622,135 +679,47 @@ function changeType(type: number | null) {
   }
 }
 
-// 사용자의 현재 위치를 가져오는 함수
-function getCurrentLocation(): Promise<{ lat: number; lng: number }> {
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
-      reject(new Error('이 브라우저는 위치 서비스를 지원하지 않습니다.'))
-      return
-    }
+// =====================================
+// 🔧 사이드바 리사이징 (Sidebar Resizing)
+// =====================================
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const location = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude
-        }
-        currentLocation.value = location // 현재 위치 저장
-        resolve(location)
-      },
-      (error) => {
-        let errorMessage = '위치 정보를 가져올 수 없습니다.'
-
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            errorMessage = '위치 접근 권한이 거부되었습니다.'
-            break
-          case error.POSITION_UNAVAILABLE:
-            errorMessage = '위치 정보를 사용할 수 없습니다.'
-            break
-          case error.TIMEOUT:
-            errorMessage = '위치 정보 요청 시간이 초과되었습니다.'
-            break
-        }
-
-        reject(new Error(errorMessage))
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 300000
-      }
-    )
-  })
+function startResizing(e: MouseEvent) {
+  isResizing = true
+  document.addEventListener('mousemove', resizeSidebar)
+  document.addEventListener('mouseup', stopResizing)
 }
 
-// 적절한 지도 레벨을 결정하는 함수
-function getMapLevel(lat: number, lng: number): number {
-  // 한국 내 위치인지 확인 (대략적인 범위)
-  const isInKorea = lat >= 33 && lat <= 39 && lng >= 124 && lng <= 132
-
-  if (isInKorea) {
-    return 6
-  } else {
-    return 8
-  }
+function resizeSidebar(e: MouseEvent) {
+  if (!isResizing) return
+  const minWidth = 260
+  const maxWidth = 600
+  const newWidth = Math.min(Math.max(e.clientX, minWidth), maxWidth)
+  sidebarWidth.value = newWidth
 }
 
-async function initializeMap() {
-  if (typeof kakao === 'undefined') {
-    console.error('❌ Kakao 객체가 없습니다.')
-    return
-  }
-
-  const container = document.getElementById('map')
-  if (!container) {
-    console.error('❌ #map DOM을 찾을 수 없습니다.')
-    return
-  }
-
-  let mapLat = DEFAULT_LAT
-  let mapLng = DEFAULT_LNG
-  let mapLevel = DEFAULT_LEVEL
-
-  // 현재 위치 가져오기 시도
-  isLoadingLocation.value = true
-  locationError.value = null
-
-  try {
-    const location = await getCurrentLocation()
-    mapLat = location.lat
-    mapLng = location.lng
-    mapLevel = getMapLevel(mapLat, mapLng)
-
-    console.log(`✅ 현재 위치: ${mapLat}, ${mapLng}`)
-  } catch (error) {
-    console.warn('현재 위치를 가져올 수 없어서 기본 위치(서울)로 설정합니다:', error)
-    locationError.value = error instanceof Error ? error.message : '위치를 가져올 수 없습니다.'
-
-    // 기본 위치 사용
-    currentLocation.value = {
-      lat: DEFAULT_LAT,
-      lng: DEFAULT_LNG
-    }
-  } finally {
-    isLoadingLocation.value = false
-  }
-
-  // 지도 초기화
-  const mapOption = {
-    center: new kakao.maps.LatLng(mapLat, mapLng),
-    level: mapLevel,
-  }
-
-  map = new kakao.maps.Map(container, mapOption)
-
-  // 현재 위치에 마커 표시 (기본 위치가 아닌 경우에만)
-  if (mapLat !== DEFAULT_LAT || mapLng !== DEFAULT_LNG) {
-    const currentLocationMarker = new kakao.maps.Marker({
-      position: new kakao.maps.LatLng(mapLat, mapLng),
-      map: map,
-      image: new kakao.maps.MarkerImage(
-        'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png',
-        new kakao.maps.Size(24, 35)
-      )
-    })
-
-    const currentLocationInfoWindow = new kakao.maps.InfoWindow({
-      content: '<div style="padding:5px; font-size:13px; color: #0066cc;"><strong>📍 현재 위치</strong></div>'
-    })
-
-    kakao.maps.event.addListener(currentLocationMarker, 'click', () => {
-      currentLocationInfoWindow.open(map, currentLocationMarker)
-    })
-  }
-
-  // 지도 이벤트 리스너 등록
-  kakao.maps.event.addListener(map, 'idle', fetchSpots)
-  fetchSpots()
+function stopResizing() {
+  isResizing = false
+  document.removeEventListener('mousemove', resizeSidebar)
+  document.removeEventListener('mouseup', stopResizing)
 }
+
+// =====================================
+// 🛠️ 유틸리티 함수들 (Utility Functions)
+// =====================================
+
+function getTypeName(typeId: number): string {
+  return typeMap[typeId] || '기타'
+}
+
+// =====================================
+// 🔄 생명주기 훅들 (Lifecycle Hooks)
+// =====================================
 
 onMounted(() => {
   initializeMap()
+})
+
+onBeforeUnmount(() => {
+  stopResizing()
 })
 </script>
