@@ -37,20 +37,38 @@
       </div>
 
       <!-- 위치 안내 메시지 -->
-      <div v-if="isLoadingLocation" class="p-4 bg-blue-50 text-blue-700">📍 현재 위치를 가져오는 중...</div>
-      <div v-if="locationError" class="p-4 bg-yellow-50 text-yellow-700">
+      <div v-if="isLoadingLocation" class="p-4 bg-blue-900 text-blue-200">📍 현재 위치를 가져오는 중...</div>
+      <div v-if="locationError" class="p-4 bg-yellow-900 text-yellow-200">
         ⚠️ {{ locationError }}<br />
-        <span class="text-sm text-yellow-600">서울 지역으로 기본 설정됩니다.</span>
+        <span class="text-sm text-yellow-300">서울 지역으로 기본 설정됩니다.</span>
+      </div>
+
+      <!-- 정렬 옵션 -->
+      <div class="p-4 border-b border-gray-700">
+        <select
+          v-model="sortOption"
+          class="w-full p-2 border border-gray-600 rounded-lg bg-gray-800 text-white text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+        >
+          <option value="rating">⭐ 평점 높은 순</option>
+          <option value="rating-low">⭐ 평점 낮은 순</option>
+          <option value="reviews">💬 리뷰 많은 순</option>
+          <option value="name">🔤 이름 순</option>
+        </select>
       </div>
 
       <!-- 선택된 관광지 상세 정보 -->
-      <div v-if="selectedSpot" class="p-4">
+      <div v-if="selectedSpot && selectedSpotDetail" class="p-4">
         <SpotDetail
-          :spot="selectedSpot"
-          :rating="getRandomRating(selectedSpot.no)"
+          :spot="selectedSpotDetail"
+          :is-loading="isLoadingSpotDetail"
           @close="closeSpotDetail"
           @move-to-spot="moveToSpot"
         />
+      </div>
+
+      <!-- 상세 정보 로딩 중 -->
+      <div v-else-if="selectedSpot && isLoadingSpotDetail" class="p-4 text-center text-gray-400">
+        <div class="animate-pulse">상세 정보를 불러오는 중...</div>
       </div>
 
       <!-- 검색 상태 표시 -->
@@ -59,23 +77,24 @@
       </div>
 
       <!-- 검색 결과가 없을 경우 -->
-      <div v-else-if="filteredSpots.length === 0" class="p-4 text-center text-gray-400">
+      <div v-else-if="sortedSpots.length === 0" class="p-4 text-center text-gray-400">
         <p>검색 결과가 없습니다.</p>
         <p class="text-sm">다른 지역으로 이동하거나 검색어를 변경해보세요.</p>
       </div>
 
       <!-- 관광지 목록 -->
       <div v-else class="p-4 space-y-3 text-sm">
-        <div v-for="spot in filteredSpots" :key="spot.no" @click="selectSpot(spot)" class="cursor-pointer transition-transform hover:scale-[1.02]">
+        <div v-for="spot in sortedSpots" :key="spot.no" @click="selectSpot(spot)" class="cursor-pointer transition-transform hover:scale-[1.02]">
           <SpotCard
             :title="spot.title"
             :type="getTypeName(spot.contentTypeId)"
-            :rating="getRandomRating(spot.no)"
+            :rating="spot.averageRating"
+            :review-count="spot.reviewCount"
           />
         </div>
 
         <!-- 더 많은 결과가 있을 경우 -->
-        <div v-if="filteredSpots.length >= 20" class="text-center text-gray-400 mt-2">
+        <div v-if="sortedSpots.length >= 300" class="text-center text-gray-400 mt-2">
           <p>더 많은 결과를 보려면 지도를 조정하세요</p>
         </div>
       </div>
@@ -103,10 +122,34 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, ref, computed} from 'vue'
 import { onBeforeUnmount } from 'vue'
 import SpotCard from '@/components/SpotCard.vue'
 import SpotDetail from '@/components/SpotDetail.vue'
+
+// 기본 관광지 정보 타입
+interface BasicSpot {
+  no: number
+  title: string
+  contentTypeId: number
+  latitude: number
+  longitude: number
+  averageRating: number
+  reviewCount: number
+}
+
+// 상세 관광지 정보 타입
+interface DetailSpot extends BasicSpot {
+  ageRatings: {
+    twenties: number
+    thirties: number
+    forties: number
+    fifties: number
+    sixties: number
+  }
+  mostPopularAccompanyType: string
+  mostPopularMotive: string
+}
 
 const sidebarWidth = ref(360) // 사이드바 초기 너비
 let isResizing = false
@@ -116,10 +159,15 @@ const currentType = ref<number | null>(null)
 const isLoadingLocation = ref(false)
 const locationError = ref<string | null>(null)
 const isLoadingSpots = ref(false)
-const spots = ref<any[]>([])
+const isLoadingSpotDetail = ref(false)
+const spots = ref<BasicSpot[]>([])
 const searchKeyword = ref('')
-const selectedSpot = ref<any | null>(null)
+const selectedSpot = ref<BasicSpot | null>(null)
+const selectedSpotDetail = ref<DetailSpot | null>(null)
 const currentLocation = ref<{lat: number, lng: number} | null>(null)
+
+// 정렬 옵션 상태
+const sortOption = ref('rating')
 
 // 검색어 필터링된 관광지 목록
 const filteredSpots = computed(() => {
@@ -127,9 +175,60 @@ const filteredSpots = computed(() => {
 
   const keyword = searchKeyword.value.toLowerCase()
   return spots.value.filter(spot =>
-    spot.title.toLowerCase().includes(keyword) ||
-    (spot.addr && spot.addr.toLowerCase().includes(keyword))
+    spot.title.toLowerCase().includes(keyword)
   )
+})
+
+// 🔥 정렬 기능 추가 - 검색 + 정렬이 모두 적용된 최종 목록
+const sortedSpots = computed(() => {
+  const spotsToSort = [...filteredSpots.value]
+
+  switch (sortOption.value) {
+    case 'rating':
+      return spotsToSort.sort((a, b) => {
+        const ratingA = a.averageRating || 0
+        const ratingB = b.averageRating || 0
+
+        // 평점이 둘 다 0이면 리뷰 개수로 정렬
+        if (ratingA === 0 && ratingB === 0) {
+          return (b.reviewCount || 0) - (a.reviewCount || 0)
+        }
+
+        // 평점이 0인 것은 맨 뒤로
+        if (ratingA === 0) return 1
+        if (ratingB === 0) return -1
+
+        // 평점 높은 순
+        return ratingB - ratingA
+      })
+
+    case 'rating-low':
+      return spotsToSort.sort((a, b) => {
+        const ratingA = a.averageRating || 0
+        const ratingB = b.averageRating || 0
+
+        // 평점이 둘 다 0이면 리뷰 개수로 정렬
+        if (ratingA === 0 && ratingB === 0) {
+          return (b.reviewCount || 0) - (a.reviewCount || 0)
+        }
+
+        // 평점이 0인 것은 맨 뒤로
+        if (ratingA === 0) return 1
+        if (ratingB === 0) return -1
+
+        // 평점 낮은 순
+        return ratingA - ratingB
+      })
+
+    case 'reviews':
+      return spotsToSort.sort((a, b) => (b.reviewCount || 0) - (a.reviewCount || 0))
+
+    case 'name':
+      return spotsToSort.sort((a, b) => a.title.localeCompare(b.title, 'ko'))
+
+    default:
+      return spotsToSort
+  }
 })
 
 function startResizing(e: MouseEvent) {
@@ -166,25 +265,18 @@ const DEFAULT_LNG = 126.978
 const DEFAULT_LEVEL = 7
 
 const typeMap: Record<number, string> = {
-  12: '관광지',
-  14: '문화시설',
-  15: '축제공연',
-  25: '여행코스',
-  28: '레포츠',
-  32: '숙박',
-  38: '쇼핑',
-  39: '음식점',
+  1: '자연관광지',
+  2: '역사 시설',
+  3: '공연,영화,전시',
+  4: '상업 스팟',
+  5: '레저, 스포츠',
+  6: '테마시설',
+  7: '걷기 좋은 길',
+  8: '지역 축제',
 }
 
 function getTypeName(typeId: number): string {
   return typeMap[typeId] || '기타'
-}
-
-// 리뷰 점수 랜덤 생성 (실제로는 DB에서 가져와야 함)
-function getRandomRating(id: number): number {
-  // id를 시드로 사용하여 같은 id는 항상 같은 점수를 반환하도록 함
-  const seed = id % 100
-  return 3 + (seed % 20) / 10 // 3.0 ~ 5.0 사이의 값
 }
 
 function clearMarkers() {
@@ -192,27 +284,36 @@ function clearMarkers() {
   markers = []
 }
 
-function drawMarkers(spotsData: any[]) {
+function drawMarkers(spotsData: BasicSpot[]) {
   clearMarkers()
   spots.value = spotsData // 관광지 목록 저장
 
   spotsData.forEach((spot) => {
-
     const position = new kakao.maps.LatLng(spot.latitude, spot.longitude)
     const marker = new kakao.maps.Marker({ position, map, title: spot.title })
 
+    // 🔥 평점 표시 개선
+    const ratingDisplay = spot.averageRating > 0
+      ? `⭐ ${spot.averageRating.toFixed(1)} (${spot.reviewCount}개)`
+      : '리뷰 없음'
+
     const hoverInfo = new kakao.maps.InfoWindow({
-      content: `<div style="padding:5px; font-size:13px;"><strong>${spot.title}</strong><br>${getTypeName(spot.contentTypeId)}</div>`,
+      content: `<div style="padding:5px; font-size:13px;">
+        <strong>${spot.title}</strong><br>
+        ${getTypeName(spot.contentTypeId)}<br>
+        ${ratingDisplay}
+      </div>`,
     })
 
     const detailInfo = new kakao.maps.InfoWindow({
       content: `
-          <div style="padding:10px; font-size:14px; max-width:300px;">
-            <strong>${spot.title}</strong><br/>
-            주소: ${spot.addr || '없음'}<br/>
-            <a href="#" onclick="window.selectSpotById(${spot.no}); return false;" style="color:blue;text-decoration:underline;">상세정보 보기</a>
-          </div>
-        `,
+        <div style="padding:10px; font-size:14px; max-width:300px;">
+          <strong>${spot.title}</strong><br/>
+          타입: ${getTypeName(spot.contentTypeId)}<br/>
+          평점: ${ratingDisplay}<br/>
+          <a href="#" onclick="window.selectSpotById(${spot.no}); return false;" style="color:blue;text-decoration:underline;">상세정보 보기</a>
+        </div>
+      `,
     })
 
     kakao.maps.event.addListener(marker, 'mouseover', () => hoverInfo.open(map, marker))
@@ -222,8 +323,8 @@ function drawMarkers(spotsData: any[]) {
       detailInfo.open(map, marker)
       openDetailInfoWindow = detailInfo
 
-      // 해당 관광지 선택
-      selectSpotByCoords(spot.latitude, spot.longitude)
+      // 해당 관광지 선택 (기본 정보만)
+      selectSpotBasic(spot)
     })
 
     markers.push(marker)
@@ -231,39 +332,64 @@ function drawMarkers(spotsData: any[]) {
 
   // 전역 함수로 노출시켜 인포윈도우에서 호출할 수 있게 함
   // @ts-ignore
-  window.selectSpotById = (id: number) => {
+  window.selectSpotById = async (id: number) => {
     const spot = spots.value.find(s => s.no === id)
     if (spot) {
-      selectedSpot.value = spot
+      await selectSpot(spot)
     }
   }
 }
 
-// 좌표로 관광지 선택
-function selectSpotByCoords(lat: number, lng: number) {
-  const spot = spots.value.find(s =>
-    s.latitude === lat && s.longitude === lng
-  )
-
-  if (spot) {
-    console.log(spot, "디버깅")
-    selectedSpot.value = spot
-  }
+// 기본 관광지 선택 (상세 정보 로드하지 않음)
+function selectSpotBasic(spot: BasicSpot) {
+  selectedSpot.value = spot
+  selectedSpotDetail.value = null // 상세 정보 초기화
 }
 
-// 관광지 선택 시 호출
-function selectSpot(spot: any) {
+// 관광지 선택 시 상세 정보 로드
+async function selectSpot(spot: BasicSpot) {
   selectedSpot.value = spot
+  selectedSpotDetail.value = null
+  isLoadingSpotDetail.value = true
+
+  try {
+    const response = await fetch(`/api/spots/${spot.no}/detail`)
+    if (!response.ok) {
+      throw new Error('상세 정보를 가져올 수 없습니다.')
+    }
+
+    const detailData: DetailSpot = await response.json()
+    selectedSpotDetail.value = detailData
+  } catch (error) {
+    console.error('상세 정보 로딩 실패:', error)
+    // 상세 정보 로딩 실패 시 기본 정보라도 표시
+    selectedSpotDetail.value = {
+      ...spot,
+      ageRatings: {
+        twenties: 0,
+        thirties: 0,
+        forties: 0,
+        fifties: 0,
+        sixties: 0
+      },
+      mostPopularAccompanyType: '정보 없음',
+      mostPopularMotive: '정보 없음'
+    }
+  } finally {
+    isLoadingSpotDetail.value = false
+  }
+
   moveToSpot(spot)
 }
 
 // 관광지 상세보기 닫기
 function closeSpotDetail() {
   selectedSpot.value = null
+  selectedSpotDetail.value = null
 }
 
 // 관광지 위치로 지도 이동
-function moveToSpot(spot: any) {
+function moveToSpot(spot: BasicSpot) {
   const position = new kakao.maps.LatLng(spot.latitude, spot.longitude)
   map.setCenter(position)
   map.setLevel(3) // 더 가까이 줌
@@ -277,14 +403,19 @@ function moveToSpot(spot: any) {
   if (marker) {
     if (openDetailInfoWindow) openDetailInfoWindow.close()
 
+    const ratingDisplay = spot.averageRating > 0
+      ? `⭐ ${spot.averageRating.toFixed(1)} (리뷰 ${spot.reviewCount}개)`
+      : '리뷰 없음'
+
     const detailInfo = new kakao.maps.InfoWindow({
       content: `
-          <div style="padding:10px; font-size:14px; max-width:300px;">
-            <strong>${spot.title}</strong><br/>
-            주소: ${spot.addr || '없음'}<br/>
-            <a href="#" onclick="window.selectSpotById(${spot.no}); return false;" style="color:blue;text-decoration:underline;">상세정보 보기</a>
-          </div>
-        `,
+        <div style="padding:10px; font-size:14px; max-width:300px;">
+          <strong>${spot.title}</strong><br/>
+          타입: ${getTypeName(spot.contentTypeId)}<br/>
+          평점: ${ratingDisplay}<br/>
+          <a href="#" onclick="window.selectSpotById(${spot.no}); return false;" style="color:blue;text-decoration:underline;">상세정보 보기</a>
+        </div>
+      `,
     })
 
     detailInfo.open(map, marker)
@@ -303,7 +434,7 @@ function moveToCurrentLocation() {
   }
 }
 
-// 검색 핸들러 (디바운스 적용)
+// 🔥 검색 핸들러 (디바운스 적용) - 정렬된 목록 기준으로 마커 표시
 let searchTimeout: number | null = null
 function handleSearch() {
   if (searchTimeout) {
@@ -337,14 +468,20 @@ function fetchSpots() {
 
   let url = `/api/spots/in-boundary?swLat=${sw.getLat()}&swLng=${sw.getLng()}&neLat=${ne.getLat()}&neLng=${ne.getLng()}`
   if (currentType.value !== null) {
+    console.log(currentType.value, "디버깅")
     url += `&type=${currentType.value}`
   }
 
   isLoadingSpots.value = true
 
   fetch(url)
-    .then((res) => res.json())
-    .then(data => {
+    .then((res) => {
+      if (!res.ok) {
+        throw new Error('관광지 데이터를 가져올 수 없습니다.')
+      }
+      return res.json()
+    })
+    .then((data: BasicSpot[]) => {
       drawMarkers(data)
       isLoadingSpots.value = false
     })
@@ -357,6 +494,7 @@ function fetchSpots() {
 function changeType(type: number | null) {
   currentType.value = type
   selectedSpot.value = null // 상세 정보 닫기
+  selectedSpotDetail.value = null
   fetchSpots()
 }
 
@@ -395,9 +533,9 @@ function getCurrentLocation(): Promise<{ lat: number; lng: number }> {
         reject(new Error(errorMessage))
       },
       {
-        enableHighAccuracy: true,  // 더 정확한 위치 요청
-        timeout: 10000,           // 10초 타임아웃
-        maximumAge: 300000        // 5분간 캐시된 위치 정보 사용
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 300000
       }
     )
   })
@@ -409,10 +547,8 @@ function getMapLevel(lat: number, lng: number): number {
   const isInKorea = lat >= 33 && lat <= 39 && lng >= 124 && lng <= 132
 
   if (isInKorea) {
-    // 한국 내 위치면 시/군 레벨로 설정
     return 6
   } else {
-    // 해외 위치면 좀 더 넓은 범위로 설정
     return 8
   }
 }
@@ -470,7 +606,6 @@ async function initializeMap() {
     const currentLocationMarker = new kakao.maps.Marker({
       position: new kakao.maps.LatLng(mapLat, mapLng),
       map: map,
-      // 현재 위치 마커에 다른 이미지 사용
       image: new kakao.maps.MarkerImage(
         'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png',
         new kakao.maps.Size(24, 35)
