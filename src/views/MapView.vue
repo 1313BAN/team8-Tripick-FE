@@ -156,7 +156,7 @@ const currentLocation = ref<{ lat: number; lng: number } | null>(null)
 
 // 검색 관련
 const searchKeyword = ref('')
-let searchTimeout: number | null = null
+let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
 // 지도 관련 변수
 let map: kakao.maps.Map

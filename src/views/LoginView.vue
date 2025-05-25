@@ -30,7 +30,7 @@ const handleLogin = async () => {
   try {
     await auth.login(email.value, password.value)
     router.push('/')
-  } catch (err) {
+  } catch {
     alert('로그인 실패')
   }
 }

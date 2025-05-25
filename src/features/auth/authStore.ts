@@ -16,6 +16,18 @@ export const useAuthStore = defineStore('auth', {
     isLoggedIn: (state) => !!state.accessToken,
   },
   actions: {
+    async initialize() {
+      if (this.accessToken) {
+        try {
+          await this.fetchMe()
+          await this.fetchMyDetail()
+        } catch {
+          console.warn('⚠️ 사용자 정보를 불러오지 못했습니다. 로그아웃 처리됨.')
+          await this.logout()
+        }
+      }
+    },
+
     async login(email: string, password: string) {
       const res = await axios.post<AuthResponse>(
         '/auth/login',
