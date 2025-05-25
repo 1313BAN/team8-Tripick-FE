@@ -7,12 +7,14 @@ declare global {
 
   namespace kakao {
     namespace maps {
+      function load(callback: () => void): void
       class Map {
         constructor(container: HTMLElement, options: any)
         setCenter(latlng: LatLng): void
         setLevel(level: number): void
         getLevel(): number
         getBounds(): LatLngBounds
+        setBounds(bounds: LatLngBounds): void
         // ... 필요한 메서드만 선언 추가
       }
 
