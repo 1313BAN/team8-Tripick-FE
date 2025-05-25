@@ -1,6 +1,6 @@
 export async function loadKakaoMap(): Promise<void> {
   return new Promise((resolve, reject) => {
-    if (window.kakao && window.kakao.maps) {
+    if (window.kakao?.maps) {
       // 이미 로드된 경우
       resolve()
       return
