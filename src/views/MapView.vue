@@ -27,18 +27,24 @@
           class="px-3 py-1 rounded-full text-sm"
           :class="currentType === null ? 'bg-red-600 text-white' : 'bg-gray-700'"
           @click="changeType(null)"
-        >전체</button>
+        >
+          전체
+        </button>
         <button
           v-for="(name, id) in typeMap"
           :key="id"
           class="px-3 py-1 rounded-full text-sm"
           :class="currentType === Number(id) ? 'bg-red-600 text-white' : 'bg-gray-700'"
           @click="changeType(Number(id))"
-        >{{ name }}</button>
+        >
+          {{ name }}
+        </button>
       </div>
 
       <!-- 위치 안내 메시지 -->
-      <div v-if="isLoadingLocation" class="p-4 bg-blue-900 text-blue-200">📍 현재 위치를 가져오는 중...</div>
+      <div v-if="isLoadingLocation" class="p-4 bg-blue-900 text-blue-200">
+        📍 현재 위치를 가져오는 중...
+      </div>
       <div v-if="locationError" class="p-4 bg-yellow-900 text-yellow-200">
         ⚠️ {{ locationError }}<br />
         <span class="text-sm text-yellow-300">서울 지역으로 기본 설정됩니다.</span>
@@ -78,7 +84,12 @@
 
       <!-- 관광지 목록 -->
       <div v-else class="p-4 space-y-3 text-sm">
-        <div v-for="spot in displaySpots" :key="spot.no" @click="selectSpot(spot)" class="cursor-pointer transition-transform hover:scale-[1.02]">
+        <div
+          v-for="spot in displaySpots"
+          :key="spot.no"
+          @click="selectSpot(spot)"
+          class="cursor-pointer transition-transform hover:scale-[1.02]"
+        >
           <SpotCard
             :title="spot.title"
             :type="getTypeName(spot.contentTypeId)"
@@ -111,13 +122,14 @@
 </template>
 
 <script setup lang="ts">
+import { loadKakaoMap } from '@/utils/loadKakaoMap'
 import { onMounted, ref, computed } from 'vue'
 import { onBeforeUnmount } from 'vue'
 import SpotCard from '@/components/SpotCard.vue'
 import SpotDetail from '@/components/SpotDetail.vue'
 import type { BasicSpot, DetailSpot } from '@/types/spot'
 import { typeMap } from '@/constants/SPOTTYPE'
-
+import axios from '@/api/axios'
 
 // 상태 관리 (State Management)
 
@@ -140,7 +152,7 @@ const spots = ref<BasicSpot[]>([]) // 지도 범위 내 관광지
 const searchResults = ref<BasicSpot[]>([]) // DB 검색 결과
 const selectedSpot = ref<BasicSpot | null>(null)
 const selectedSpotDetail = ref<DetailSpot | null>(null)
-const currentLocation = ref<{lat: number, lng: number} | null>(null)
+const currentLocation = ref<{ lat: number; lng: number } | null>(null)
 
 // 검색 관련
 const searchKeyword = ref('')
@@ -251,7 +263,7 @@ async function initializeMap() {
     // 기본 위치 사용
     currentLocation.value = {
       lat: DEFAULT_LAT,
-      lng: DEFAULT_LNG
+      lng: DEFAULT_LNG,
     }
   } finally {
     isLoadingLocation.value = false
@@ -272,12 +284,13 @@ async function initializeMap() {
       map: map,
       image: new kakao.maps.MarkerImage(
         'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png',
-        new kakao.maps.Size(24, 35)
-      )
+        new kakao.maps.Size(24, 35),
+      ),
     })
 
     const currentLocationInfoWindow = new kakao.maps.InfoWindow({
-      content: '<div style="padding:5px; font-size:13px; color: #0066cc;"><strong>📍 현재 위치</strong></div>'
+      content:
+        '<div style="padding:5px; font-size:13px; color: #0066cc;"><strong>📍 현재 위치</strong></div>',
     })
 
     kakao.maps.event.addListener(currentLocationMarker, 'click', () => {
@@ -302,7 +315,7 @@ function getCurrentLocation(): Promise<{ lat: number; lng: number }> {
       (position) => {
         const location = {
           lat: position.coords.latitude,
-          lng: position.coords.longitude
+          lng: position.coords.longitude,
         }
         currentLocation.value = location // 현재 위치 저장
         resolve(location)
@@ -327,8 +340,8 @@ function getCurrentLocation(): Promise<{ lat: number; lng: number }> {
       {
         enableHighAccuracy: true,
         timeout: 10000,
-        maximumAge: 300000
-      }
+        maximumAge: 300000,
+      },
     )
   })
 }
@@ -337,59 +350,45 @@ function getCurrentLocation(): Promise<{ lat: number; lng: number }> {
 // 🌐 API 호출 함수들 (API Functions)
 // =====================================
 
-function fetchSpots() {
+async function fetchSpots() {
   if (!map) return
 
   const bounds = map.getBounds()
   const sw = bounds.getSouthWest()
   const ne = bounds.getNorthEast()
 
-  let url = `/api/spots/in-boundary?swLat=${sw.getLat()}&swLng=${sw.getLng()}&neLat=${ne.getLat()}&neLng=${ne.getLng()}`
+  let url = `/spots/in-boundary?swLat=${sw.getLat()}&swLng=${sw.getLng()}&neLat=${ne.getLat()}&neLng=${ne.getLng()}`
   if (currentType.value !== null) {
-    console.log(currentType.value, "디버깅")
     url += `&type=${currentType.value}`
   }
 
   isLoadingSpots.value = true
 
-  fetch(url)
-    .then((res) => {
-      if (!res.ok) {
-        throw new Error('관광지 데이터를 가져올 수 없습니다.')
-      }
-      return res.json()
-    })
-    .then((data: BasicSpot[]) => {
-      drawMarkers(data)
-      isLoadingSpots.value = false
-    })
-    .catch((err) => {
-      console.error('관광지 데이터 요청 실패:', err)
-      isLoadingSpots.value = false
-    })
+  try {
+    const res = await axios.get<BasicSpot[]>(url)
+    drawMarkers(res.data)
+  } catch (err) {
+    console.error('관광지 데이터 요청 실패:', err)
+  } finally {
+    isLoadingSpots.value = false
+  }
 }
 
 // 🔥 DB에서 검색하는 함수
-async function searchSpotsFromDB(keyword: string, type: number | null = null): Promise<BasicSpot[]> {
+async function searchSpotsFromDB(
+  keyword: string,
+  type: number | null = null,
+): Promise<BasicSpot[]> {
   try {
     isSearching.value = true
-
     const params = new URLSearchParams()
     params.append('keyword', keyword)
-    if (type !== null) {
-      params.append('type', type.toString())
-    }
+    if (type !== null) params.append('type', type.toString())
 
-    const response = await fetch(`/api/spots/search?${params}`)
-
-    if (!response.ok) {
-      throw new Error('검색 요청 실패')
-    }
-
-    const data: BasicSpot[] = await response.json()
-    return data
-  } catch (error) {
-    console.error('검색 오류:', error)
+    const res = await axios.get<BasicSpot[]>(`/spots/search?${params.toString()}`)
+    return res.data
+  } catch (err) {
+    console.error('검색 오류:', err)
     return []
   } finally {
     isSearching.value = false
@@ -419,9 +418,8 @@ function drawMarkers(spotsData: BasicSpot[]) {
     const marker = new kakao.maps.Marker({ position, map, title: spot.title })
 
     // 🔥 평점 표시 개선
-    const ratingDisplay = spot.averageRating > 0
-      ? `⭐ ${spot.averageRating.toFixed(1)} (${spot.reviewCount}개)`
-      : ''
+    const ratingDisplay =
+      spot.averageRating > 0 ? `⭐ ${spot.averageRating.toFixed(1)} (${spot.reviewCount}개)` : ''
 
     const detailInfo = new kakao.maps.InfoWindow({
       content: `
@@ -450,7 +448,7 @@ function drawMarkers(spotsData: BasicSpot[]) {
   // @ts-ignore
   window.selectSpotById = async (id: number) => {
     const allSpots = [...spots.value, ...searchResults.value]
-    const spot = allSpots.find(s => s.no === id)
+    const spot = allSpots.find((s) => s.no === id)
     if (spot) {
       await selectSpot(spot)
     }
@@ -476,9 +474,8 @@ function displaySearchResults(spotsData: BasicSpot[]) {
       title: spot.title,
     })
 
-    const ratingDisplay = spot.averageRating > 0
-      ? `⭐ ${spot.averageRating.toFixed(1)} (${spot.reviewCount}개)`
-      : ''
+    const ratingDisplay =
+      spot.averageRating > 0 ? `⭐ ${spot.averageRating.toFixed(1)} (${spot.reviewCount}개)` : ''
 
     const detailInfo = new kakao.maps.InfoWindow({
       content: `
@@ -513,7 +510,7 @@ function adjustMapBounds(spots: BasicSpot[]) {
 
   const bounds = new kakao.maps.LatLngBounds()
 
-  spots.forEach(spot => {
+  spots.forEach((spot) => {
     bounds.extend(new kakao.maps.LatLng(spot.latitude, spot.longitude))
   })
 
@@ -522,7 +519,8 @@ function adjustMapBounds(spots: BasicSpot[]) {
   // 줌 레벨이 너무 가까워지지 않게 제한
   setTimeout(() => {
     const currentLevel = map.getLevel()
-    if (currentLevel < 2) {  // 최소 레벨 5로 제한
+    if (currentLevel < 2) {
+      // 최소 레벨 5로 제한
       map.setLevel(2)
     }
   }, 100)
@@ -536,17 +534,18 @@ function moveToSpot(spot: BasicSpot) {
 
   // 해당 마커의 인포윈도우 열기
   const allMarkers = [...markers, ...searchMarkers]
-  const marker = allMarkers.find(m =>
-    m.getPosition().getLat() === spot.latitude &&
-    m.getPosition().getLng() === spot.longitude
+  const marker = allMarkers.find(
+    (m) =>
+      m.getPosition().getLat() === spot.latitude && m.getPosition().getLng() === spot.longitude,
   )
 
   if (marker) {
     if (openDetailInfoWindow) openDetailInfoWindow.close()
 
-    const ratingDisplay = spot.averageRating > 0
-      ? `⭐ ${spot.averageRating.toFixed(1)} (리뷰 ${spot.reviewCount}개)`
-      : ''
+    const ratingDisplay =
+      spot.averageRating > 0
+        ? `⭐ ${spot.averageRating.toFixed(1)} (리뷰 ${spot.reviewCount}개)`
+        : ''
 
     const detailInfo = new kakao.maps.InfoWindow({
       content: `
@@ -606,7 +605,6 @@ async function handleSearch() {
 
       // 검색 결과를 지도에 표시
       displaySearchResults(results)
-
     } catch (error) {
       console.error('검색 처리 오류:', error)
     }
@@ -630,16 +628,10 @@ async function selectSpot(spot: BasicSpot) {
   isLoadingSpotDetail.value = true
 
   try {
-    const response = await fetch(`/api/spots/${spot.no}/detail`)
-    if (!response.ok) {
-      throw new Error('상세 정보를 가져올 수 없습니다.')
-    }
-
-    const detailData: DetailSpot = await response.json()
-    selectedSpotDetail.value = detailData
-  } catch (error) {
-    console.error('상세 정보 로딩 실패:', error)
-    // 상세 정보 로딩 실패 시 기본 정보라도 표시
+    const res = await axios.get<DetailSpot>(`/spots/${spot.no}/detail`)
+    selectedSpotDetail.value = res.data
+  } catch (err) {
+    console.error('상세 정보 로딩 실패:', err)
     selectedSpotDetail.value = {
       ...spot,
       ageRatings: {
@@ -647,10 +639,10 @@ async function selectSpot(spot: BasicSpot) {
         thirties: 0,
         forties: 0,
         fifties: 0,
-        sixties: 0
+        sixties: 0,
       },
       mostPopularAccompanyType: '정보 없음',
-      mostPopularMotive: '정보 없음'
+      mostPopularMotive: '정보 없음',
     }
   } finally {
     isLoadingSpotDetail.value = false
@@ -711,12 +703,13 @@ function getTypeName(typeId: number): string {
   return typeMap[typeId] || '기타'
 }
 
-// =====================================
-// 🔄 생명주기 훅들 (Lifecycle Hooks)
-// =====================================
-
-onMounted(() => {
-  initializeMap()
+onMounted(async () => {
+  try {
+    await loadKakaoMap()
+    await initializeMap()
+  } catch (err) {
+    console.error('❌ Kakao 지도 로딩 실패:', err)
+  }
 })
 
 onBeforeUnmount(() => {
