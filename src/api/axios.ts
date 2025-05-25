@@ -16,8 +16,10 @@ function processQueue(error: unknown, token: string | null = null) {
   failedQueue = []
 }
 
+const baseURL = import.meta.env.VITE_API_BASE_URL
+
 const instance = axios.create({
-  baseURL: '/api',
+  baseURL,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -55,7 +57,7 @@ instance.interceptors.response.use(
 
       isRefreshing = true
       try {
-        const res = await axios.post('/api/auth/reissue', null, {
+        const res = await axios.post(`${baseURL}/auth/reissue`, null, {
           withCredentials: true,
         })
         const newAccessToken = res.data.accessToken

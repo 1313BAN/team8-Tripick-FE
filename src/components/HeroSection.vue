@@ -4,17 +4,41 @@
       <h1 class="text-4xl font-bold mb-4">당신만의 특별한 여행</h1>
 
       <div v-if="showResults">
-        <div
-          v-for="spot in results"
-          :key="spot.no"
-          class="bg-white p-4 rounded-lg shadow mb-4 text-left"
-        >
-          <h2 class="text-xl font-semibold">{{ spot.title }}</h2>
-          <p class="text-gray-500 text-sm">{{ spot.addr }} | {{ spot.type }}</p>
-          <p class="text-sm mt-2">👉 {{ spot.reason }}</p>
+        <!-- 가로 스크롤 컨테이너 -->
+        <div class="overflow-x-auto whitespace-nowrap py-4 -mx-2 px-2">
+          <!-- 관광지 카드 -->
+          <div
+            v-for="spot in results"
+            :key="spot.no"
+            class="inline-block align-top bg-white p-4 rounded-lg shadow mr-4 w-fit text-left"
+          >
+            <h2 class="text-xl font-semibold">{{ spot.title }}</h2>
+            <p class="text-gray-500 text-sm">{{ spot.addr }} | {{ spot.type }}</p>
+            <p class="text-sm mt-2">👉 {{ spot.reason }}</p>
+
+            <!-- 동행 유형 박스 -->
+            <div class="block w-fit bg-blue-50 border border-blue-300 rounded-xl px-3 py-1 mt-3">
+              <p class="text-[10px] text-blue-800 font-medium">
+                {{ spot.accompanySummary }}
+              </p>
+            </div>
+
+            <!-- 여행 동기 박스 -->
+            <div class="block w-fit bg-green-50 border border-green-300 rounded-xl px-3 py-1 mt-2">
+              <p class="text-[10px] text-green-800 font-medium">
+                {{ spot.motiveSummary }}
+              </p>
+            </div>
+          </div>
         </div>
 
-        <Button variant="secondary" size="lg" class="mt-6" @click="emit('reset')">
+        <Button
+          :disabled="isLoading"
+          variant="secondary"
+          size="lg"
+          class="mt-6 cursor-pointer"
+          @click="emit('reset')"
+        >
           다시 추천받기
         </Button>
       </div>
@@ -37,8 +61,17 @@
           />
         </div>
 
+        <div v-if="isLoading" class="text-lg font-semibold text-gray-600 animate-pulse my-6">
+          관광지를 추천 중...
+        </div>
         <!-- 관광지 추천 버튼 -->
-        <Button variant="destructive" size="lg" @click="emit('recommend')">
+        <Button
+          :disabled="isLoading"
+          variant="destructive"
+          size="lg"
+          class="cursor-pointer"
+          @click="emit('recommend')"
+        >
           관광지 추천 받기
         </Button>
 
@@ -60,6 +93,7 @@ interface Tag {
 interface Props {
   hashtags: Tag[]
   selectedTags: string[]
+  isLoading: boolean
   showResults: boolean
   results: {
     no: number

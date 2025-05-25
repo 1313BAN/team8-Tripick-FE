@@ -26,18 +26,24 @@
           class="px-3 py-1 rounded-full text-sm"
           :class="currentType === null ? 'bg-red-600 text-white' : 'bg-gray-700'"
           @click="changeType(null)"
-        >전체</button>
+        >
+          전체
+        </button>
         <button
           v-for="(name, id) in typeMap"
           :key="id"
           class="px-3 py-1 rounded-full text-sm"
           :class="currentType === Number(id) ? 'bg-red-600 text-white' : 'bg-gray-700'"
           @click="changeType(Number(id))"
-        >{{ name }}</button>
+        >
+          {{ name }}
+        </button>
       </div>
 
       <!-- 위치 안내 메시지 -->
-      <div v-if="isLoadingLocation" class="p-4 bg-blue-50 text-blue-700">📍 현재 위치를 가져오는 중...</div>
+      <div v-if="isLoadingLocation" class="p-4 bg-blue-50 text-blue-700">
+        📍 현재 위치를 가져오는 중...
+      </div>
       <div v-if="locationError" class="p-4 bg-yellow-50 text-yellow-700">
         ⚠️ {{ locationError }}<br />
         <span class="text-sm text-yellow-600">서울 지역으로 기본 설정됩니다.</span>
@@ -66,7 +72,12 @@
 
       <!-- 관광지 목록 -->
       <div v-else class="p-4 space-y-3 text-sm">
-        <div v-for="spot in filteredSpots" :key="spot.no" @click="selectSpot(spot)" class="cursor-pointer transition-transform hover:scale-[1.02]">
+        <div
+          v-for="spot in filteredSpots"
+          :key="spot.no"
+          @click="selectSpot(spot)"
+          class="cursor-pointer transition-transform hover:scale-[1.02]"
+        >
           <SpotCard
             :title="spot.title"
             :type="getTypeName(spot.contentTypeId)"
@@ -103,6 +114,7 @@
 </template>
 
 <script setup lang="ts">
+import { loadKakaoMap } from '@/utils/loadKakaoMap'
 import { onMounted, ref, computed } from 'vue'
 import { onBeforeUnmount } from 'vue'
 import SpotCard from '@/components/SpotCard.vue'
@@ -119,16 +131,17 @@ const isLoadingSpots = ref(false)
 const spots = ref<any[]>([])
 const searchKeyword = ref('')
 const selectedSpot = ref<any | null>(null)
-const currentLocation = ref<{lat: number, lng: number} | null>(null)
+const currentLocation = ref<{ lat: number; lng: number } | null>(null)
 
 // 검색어 필터링된 관광지 목록
 const filteredSpots = computed(() => {
   if (!searchKeyword.value) return spots.value
 
   const keyword = searchKeyword.value.toLowerCase()
-  return spots.value.filter(spot =>
-    spot.title.toLowerCase().includes(keyword) ||
-    (spot.addr && spot.addr.toLowerCase().includes(keyword))
+  return spots.value.filter(
+    (spot) =>
+      spot.title.toLowerCase().includes(keyword) ||
+      (spot.addr && spot.addr.toLowerCase().includes(keyword)),
   )
 })
 
@@ -197,7 +210,6 @@ function drawMarkers(spotsData: any[]) {
   spots.value = spotsData // 관광지 목록 저장
 
   spotsData.forEach((spot) => {
-
     const position = new kakao.maps.LatLng(spot.latitude, spot.longitude)
     const marker = new kakao.maps.Marker({ position, map, title: spot.title })
 
@@ -232,7 +244,7 @@ function drawMarkers(spotsData: any[]) {
   // 전역 함수로 노출시켜 인포윈도우에서 호출할 수 있게 함
   // @ts-ignore
   window.selectSpotById = (id: number) => {
-    const spot = spots.value.find(s => s.no === id)
+    const spot = spots.value.find((s) => s.no === id)
     if (spot) {
       selectedSpot.value = spot
     }
@@ -241,12 +253,10 @@ function drawMarkers(spotsData: any[]) {
 
 // 좌표로 관광지 선택
 function selectSpotByCoords(lat: number, lng: number) {
-  const spot = spots.value.find(s =>
-    s.latitude === lat && s.longitude === lng
-  )
+  const spot = spots.value.find((s) => s.latitude === lat && s.longitude === lng)
 
   if (spot) {
-    console.log(spot, "디버깅")
+    console.log(spot, '디버깅')
     selectedSpot.value = spot
   }
 }
@@ -269,9 +279,9 @@ function moveToSpot(spot: any) {
   map.setLevel(3) // 더 가까이 줌
 
   // 해당 마커의 인포윈도우 열기
-  const marker = markers.find(m =>
-    m.getPosition().getLat() === spot.latitude &&
-    m.getPosition().getLng() === spot.longitude
+  const marker = markers.find(
+    (m) =>
+      m.getPosition().getLat() === spot.latitude && m.getPosition().getLng() === spot.longitude,
   )
 
   if (marker) {
@@ -314,14 +324,12 @@ function handleSearch() {
     // 검색어가 있으면 필터링된 목록 사용, 없으면 모든 관광지 표시
     if (!searchKeyword.value) {
       // 마커 전체 다시 표시
-      markers.forEach(marker => marker.setMap(map))
+      markers.forEach((marker) => marker.setMap(map))
     } else {
       // 검색어로 필터링된 관광지만 마커 표시
       const filtered = filteredSpots.value
-      markers.forEach(marker => {
-        const isVisible = filtered.some(spot =>
-          spot.title === marker.getTitle()
-        )
+      markers.forEach((marker) => {
+        const isVisible = filtered.some((spot) => spot.title === marker.getTitle())
         marker.setMap(isVisible ? map : null)
       })
     }
@@ -344,7 +352,7 @@ function fetchSpots() {
 
   fetch(url)
     .then((res) => res.json())
-    .then(data => {
+    .then((data) => {
       drawMarkers(data)
       isLoadingSpots.value = false
     })
@@ -372,7 +380,7 @@ function getCurrentLocation(): Promise<{ lat: number; lng: number }> {
       (position) => {
         const location = {
           lat: position.coords.latitude,
-          lng: position.coords.longitude
+          lng: position.coords.longitude,
         }
         currentLocation.value = location // 현재 위치 저장
         resolve(location)
@@ -395,10 +403,10 @@ function getCurrentLocation(): Promise<{ lat: number; lng: number }> {
         reject(new Error(errorMessage))
       },
       {
-        enableHighAccuracy: true,  // 더 정확한 위치 요청
-        timeout: 10000,           // 10초 타임아웃
-        maximumAge: 300000        // 5분간 캐시된 위치 정보 사용
-      }
+        enableHighAccuracy: true, // 더 정확한 위치 요청
+        timeout: 10000, // 10초 타임아웃
+        maximumAge: 300000, // 5분간 캐시된 위치 정보 사용
+      },
     )
   })
 }
@@ -451,7 +459,7 @@ async function initializeMap() {
     // 기본 위치 사용
     currentLocation.value = {
       lat: DEFAULT_LAT,
-      lng: DEFAULT_LNG
+      lng: DEFAULT_LNG,
     }
   } finally {
     isLoadingLocation.value = false
@@ -473,12 +481,13 @@ async function initializeMap() {
       // 현재 위치 마커에 다른 이미지 사용
       image: new kakao.maps.MarkerImage(
         'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png',
-        new kakao.maps.Size(24, 35)
-      )
+        new kakao.maps.Size(24, 35),
+      ),
     })
 
     const currentLocationInfoWindow = new kakao.maps.InfoWindow({
-      content: '<div style="padding:5px; font-size:13px; color: #0066cc;"><strong>📍 현재 위치</strong></div>'
+      content:
+        '<div style="padding:5px; font-size:13px; color: #0066cc;"><strong>📍 현재 위치</strong></div>',
     })
 
     kakao.maps.event.addListener(currentLocationMarker, 'click', () => {
@@ -491,7 +500,12 @@ async function initializeMap() {
   fetchSpots()
 }
 
-onMounted(() => {
-  initializeMap()
+onMounted(async () => {
+  try {
+    await loadKakaoMap()
+    await initializeMap()
+  } catch (err) {
+    console.error('❌ Kakao 지도 로딩 실패:', err)
+  }
 })
 </script>

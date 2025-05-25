@@ -6,6 +6,7 @@
       :selected-tags="selectedTags"
       :show-results="showResults"
       :results="recommendResults"
+      :is-loading="isLoading"
       @toggle-tag="toggleTag"
       @recommend="handleRecommend"
       @reset="handleReset"
@@ -42,6 +43,7 @@ import axios from '@/api/axios'
 const selectedTags = ref<string[]>([])
 const showResults = ref(false)
 const recommendResults = ref([])
+const isLoading = ref(false)
 
 // 해시태그 토글 함수
 const toggleTag = (tagId: string) => {
@@ -54,16 +56,18 @@ const toggleTag = (tagId: string) => {
 
 // 관광지 추천 함수
 const handleRecommend = async () => {
+  isLoading.value = true
+  showResults.value = false
   try {
     const response = await axios.post('/ai-recommend/category', {
       categories: selectedTags.value,
     })
-    // 예: 결과 페이지로 이동하면서 추천 데이터 전달
     recommendResults.value = response.data
     showResults.value = true
-    console.log('🔍 추천 결과:', response.data)
   } catch (error) {
     console.error('추천 실패:', error)
+  } finally {
+    isLoading.value = false
   }
 }
 
