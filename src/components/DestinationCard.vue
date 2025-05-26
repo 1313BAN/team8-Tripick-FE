@@ -6,16 +6,14 @@
       </div>
     </CardContent>
     <CardFooter class="bg-gray-900 text-white p-4">
-      <div>
-        <h3 class="font-medium text-lg">{{ destination.title }}</h3>
-        <div class="flex gap-2 mt-1 flex-wrap">
-          <span
-            v-for="(tag, index) in destination.tags"
-            :key="index"
-            class="text-xs bg-gray-700 px-2 py-1 rounded"
-          >
-            #{{ tag }}
-          </span>
+      <div class="w-full">
+        <div class="flex justify-between items-start mb-2">
+          <h3 class="font-medium text-lg">{{ destination.title }}</h3>
+         <!-- 평점 표시 -->
+          <div v-if="destination.rating !== undefined" class="flex items-center gap-2">
+            <span class="text-yellow-400 text-xl">★</span>
+            <span class="text-lg text-white">{{ destination.rating.toFixed(1) }}</span>
+          </div>
         </div>
       </div>
     </CardFooter>
@@ -29,6 +27,7 @@ interface Destination {
   id: number;
   title: string;
   tags: string[];
+  rating?: number;
 }
 
 interface Props {

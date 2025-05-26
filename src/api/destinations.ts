@@ -15,18 +15,18 @@ interface RecommendationRequestDTO {
 }
 
 interface SpotRecommendationDTO {
-  contentId: number
-  title: string
-  addr1?: string
-  firstImage?: string
-  mapX?: number
-  mapY?: number
-  contentTypeId?: number
-  areaCode?: number
-  siGunGuCode?: number
-  rating?: number
-  tags?: string[]
-  spotName?: string
+  addr: string;
+  avgRating: number;
+  contentTypeId: number;
+  contentTypeName: string;
+  firstImage1: string;
+  latitude: number;
+  longitude: number;
+  no: number;
+  overview: string;
+  reviewCount: number;
+  title: string;
+  tags?: string[];
 }
 
 interface FilterOptions {
@@ -102,6 +102,8 @@ export const getComplexRecommendations = async (
     })
 
     console.log('API 요청 데이터:', requestData)
+    console.log('API 요청 url:', instance.defaults.baseURL)
+    console.log('VITE_API_BASE_URL:', import.meta.env.VITE_API_BASE_URL)
 
     const response: AxiosResponse<SpotRecommendationDTO[]> = await instance.post(
       '/recommendations/complex',
