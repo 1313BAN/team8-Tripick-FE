@@ -123,7 +123,7 @@
 
 <script setup lang="ts">
 import { loadKakaoMap } from '@/utils/loadKakaoMap'
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, ref, computed, watch} from 'vue'
 import { onBeforeUnmount } from 'vue'
 import SpotCard from '@/components/SpotCard.vue'
 import SpotDetail from '@/components/SpotDetail.vue'
@@ -171,6 +171,15 @@ let isResizing = false
 const DEFAULT_LAT = 37.5665
 const DEFAULT_LNG = 126.978
 const DEFAULT_LEVEL = 7
+
+// 🔥 props 받기 (라우터에서 전달되는 spotId)
+const props = defineProps({
+  spotId: {
+    type: String, // URL params는 항상 string
+    default: null
+  }
+})
+
 
 // =====================================
 // 🧮 계산된 속성 (Computed Properties)
@@ -224,6 +233,16 @@ const displaySpots = computed(() => {
       return spotsToSort
   }
 })
+
+// =====================================
+// 🚀
+// =====================================
+watch(() => props.spotId, async (newSpotId) => {
+  if (newSpotId && map) {
+    console.log('🎯 새로운 관광지 ID:', newSpotId)
+    await handleSpotSelection(Number(newSpotId))
+  }
+}, { immediate: true })
 
 // =====================================
 // 🚀 초기화 함수들 (Initialization)
@@ -301,6 +320,10 @@ async function initializeMap() {
   // 지도 이벤트 리스너 등록
   kakao.maps.event.addListener(map, 'idle', fetchSpots)
   fetchSpots()
+
+   if (props.spotId) {
+    await handleSpotSelection(Number(props.spotId))
+  }
 }
 
 // 사용자의 현재 위치를 가져오는 함수
@@ -349,6 +372,33 @@ function getCurrentLocation(): Promise<{ lat: number; lng: number }> {
 // =====================================
 // 🌐 API 호출 함수들 (API Functions)
 // =====================================
+
+async function handleSpotSelection(spotId: any) {
+  if (!spotId || !map) return
+
+  try {
+    // 1. 먼저 API에서 해당 관광지 정보 가져오기
+    const response = await axios.get(`/spots/${spotId}`)
+    const spotData = response.data
+
+    // 2. 해당 위치로 지도 이동
+    const position = new kakao.maps.LatLng(spotData.latitude, spotData.longitude)
+    map.setCenter(position)
+    map.setLevel(3)
+
+    // 3. 관광지 선택 및 상세 정보 로드
+    await selectSpot(spotData)
+
+    console.log('✅ 관광지 자동 선택 완료:', spotData.title)
+
+  } catch (error) {
+    console.error('관광지 선택 실패:', error)
+    alert('해당 관광지를 찾을 수 없습니다.')
+  }
+}
+
+
+
 
 async function fetchSpots() {
   if (!map) return
