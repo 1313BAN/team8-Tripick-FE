@@ -1,73 +1,13 @@
 import { type AxiosResponse } from 'axios'
-import instance from '@/api/axios'
-import type { AgeRange } from '@/types/api'
-
-// 인터페이스 정의
-interface RecommendationRequestDTO {
-  gender?: string | null
-  minAge?: number
-  maxAge?: number
-  motiveCode?: number | null
-  contentTypeId?: number | null
-  areaCode?: number | null
-  siGunGuCode?: number | null
-  limit?: number
-}
-
-interface SpotRecommendationDTO {
-  addr: string;
-  avgRating: number;
-  contentTypeId: number;
-  contentTypeName: string;
-  firstImage1: string;
-  latitude: number;
-  longitude: number;
-  no: number;
-  overview: string;
-  reviewCount: number;
-  title: string;
-  tags?: string[];
-}
-
-interface FilterOptions {
-  gender?: string | null
-  age?: string | null
-  motiveCode?: number | null
-  contentTypeId?: number | null
-  areaCode?: number | null
-  siGunGuCode?: number | null
-  limit?: number
-}
-
-/**
- * 성별을 백엔드 형식으로 변환
- * @param gender - 프론트엔드 성별 ('male' | 'female')
- * @returns 백엔드 성별 형식
- */
-const convertGenderForBackend = (gender?: string | null): string | undefined => {
-  if (!gender) return undefined
-  return gender === 'male' ? 'MALE' : 'FEMALE'
-}
-
-/**
- * 연령대를 나이 범위로 변환
- * @param ageGroup - 연령대 ('10s', '20s', etc.)
- * @returns minAge, maxAge 포함한 객체
- */
-const convertAgeGroupToRange = (ageGroup?: string | null): AgeRange => {
-  if (!ageGroup) return { minAge: 0, maxAge: 100 }
-
-  const ageRanges: Record<string, AgeRange> = {
-    '10s': { minAge: 10, maxAge: 19 },
-    '20s': { minAge: 20, maxAge: 29 },
-    '30s': { minAge: 30, maxAge: 39 },
-    '40s': { minAge: 40, maxAge: 49 },
-    '50s': { minAge: 50, maxAge: 59 },
-    '60s': { minAge: 60, maxAge: 100 },
-  }
-
-  return ageRanges[ageGroup] || { minAge: 0, maxAge: 100 }
-}
+import instance from '@/api/authApi'
+import type { RecommendationRequestDTO,
+              SpotRecommendationDTO,
+              FilterOptions
+            } from '@/types/spot'
+import {
+  convertAgeGroupToRange,
+  convertGenderForBackend
+} from '@/constants/filters'
 
 /**
  * 복합 추천 API 호출
@@ -124,7 +64,7 @@ export const getComplexRecommendations = async (
 export const fetchPopularDestinations = async (): Promise<SpotRecommendationDTO[]> => {
   try {
     const response: AxiosResponse<SpotRecommendationDTO[]> =
-      await instance.get('/destinations/popular')
+      await instance.get('/recommendations/popular-2022')
     return response.data
   } catch (error) {
     console.error('인기 관광지 조회 실패:', error)
@@ -133,7 +73,7 @@ export const fetchPopularDestinations = async (): Promise<SpotRecommendationDTO[
 }
 
 // 타입 내보내기
-export type { RecommendationRequestDTO, SpotRecommendationDTO, FilterOptions, AgeRange }
+export type { RecommendationRequestDTO, SpotRecommendationDTO, FilterOptions}
 
 export default {
   getComplexRecommendations,

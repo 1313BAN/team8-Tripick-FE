@@ -25,14 +25,10 @@
 </template>
 
 <script setup lang="ts">
-interface Props {
-  title: string
-  type: string
-  rating?: number | null
-  reviewCount?: number | null
-}
+import type { SpotCardProps } from '@/types/spot'
 
-defineProps<Props>()
+
+defineProps<SpotCardProps>()
 </script>
 
 <style scoped>

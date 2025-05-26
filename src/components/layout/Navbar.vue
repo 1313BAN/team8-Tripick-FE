@@ -28,14 +28,10 @@ import { useAuthStore } from '@/features/auth/authStore'
 const router = useRouter()
 const auth = useAuthStore()
 
-console.log('디버강', auth)
-
 // 유저 이름을 가져오는 computed 속성
 const getUserName = computed(() => {
   if (!auth.user) return ''
 
-  // UserDto에서 사용 가능한 이름 필드를 우선순위대로 체크
-  // 아래 필드명들을 실제 UserDto 타입에 맞게 수정하세요
   return auth.user.nickname || auth.user.name || '사용자'
 })
 

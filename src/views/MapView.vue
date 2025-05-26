@@ -31,7 +31,7 @@
           전체
         </button>
         <button
-          v-for="(name, id) in typeMap"
+          v-for="(name, id) in CONTENT_TYPE_MAP"
           :key="id"
           class="px-3 py-1 rounded-full text-sm"
           :class="currentType === Number(id) ? 'bg-red-600 text-white' : 'bg-gray-700'"
@@ -92,7 +92,7 @@
         >
           <SpotCard
             :title="spot.title"
-            :type="getTypeName(spot.contentTypeId)"
+            :type="getContentTypeName (spot.contentTypeId)"
             :rating="spot.averageRating"
             :review-count="spot.reviewCount"
           />
@@ -125,16 +125,17 @@
 import { loadKakaoMap } from '@/utils/loadKakaoMap'
 import { onMounted, ref, computed, watch} from 'vue'
 import { onBeforeUnmount } from 'vue'
-import SpotCard from '@/components/SpotCard.vue'
-import SpotDetail from '@/components/SpotDetail.vue'
+import SpotCard from '@/components/feature/map/SpotCard.vue'
+import SpotDetail from '@/components/feature/map/SpotDetail.vue'
 import type { BasicSpot, DetailSpot } from '@/types/spot'
-import { typeMap } from '@/constants/SPOTTYPE'
-import axios from '@/api/axios'
+import axios from '@/api/authApi'
+import {MAP_CONFIG, SIDEBAR_CONFIG} from '@/constants/map'
+import { CONTENT_TYPE_MAP, getContentTypeName } from '@/constants'
 
 // 상태 관리 (State Management)
 
 // UI 상태
-const sidebarWidth = ref(360) // 사이드바 초기 너비
+const sidebarWidth = ref(SIDEBAR_CONFIG.DEFAULT_WIDTH) // 사이드바 초기 너비
 const currentType = ref<number | null>(null)
 const sortOption = ref('rating')
 
@@ -166,11 +167,6 @@ let openDetailInfoWindow: kakao.maps.InfoWindow | null = null
 
 // 사이드바 리사이징 관련
 let isResizing = false
-
-// 지도 상수
-const DEFAULT_LAT = 37.5665
-const DEFAULT_LNG = 126.978
-const DEFAULT_LEVEL = 7
 
 // 🔥 props 받기 (라우터에서 전달되는 spotId)
 const props = defineProps({
@@ -260,9 +256,9 @@ async function initializeMap() {
     return
   }
 
-  let mapLat = DEFAULT_LAT
-  let mapLng = DEFAULT_LNG
-  let mapLevel = DEFAULT_LEVEL
+  let mapLat = MAP_CONFIG.DEFAULT_LOCATION.lat
+  let mapLng = MAP_CONFIG.DEFAULT_LOCATION.lng
+  let mapLevel = MAP_CONFIG.DEFAULT_LEVEL
 
   // 현재 위치 가져오기 시도
   isLoadingLocation.value = true
@@ -281,8 +277,8 @@ async function initializeMap() {
 
     // 기본 위치 사용
     currentLocation.value = {
-      lat: DEFAULT_LAT,
-      lng: DEFAULT_LNG,
+      lat: MAP_CONFIG.DEFAULT_LOCATION.lat,
+      lng: MAP_CONFIG.DEFAULT_LOCATION.lng,
     }
   } finally {
     isLoadingLocation.value = false
@@ -297,7 +293,7 @@ async function initializeMap() {
   map = new kakao.maps.Map(container, mapOption)
 
   // 현재 위치에 마커 표시 (기본 위치가 아닌 경우에만)
-  if (mapLat !== DEFAULT_LAT || mapLng !== DEFAULT_LNG) {
+  if (mapLat !== MAP_CONFIG.DEFAULT_LOCATION.lat || mapLng !== MAP_CONFIG.DEFAULT_LOCATION.lng) {
     const currentLocationMarker = new kakao.maps.Marker({
       position: new kakao.maps.LatLng(mapLat, mapLng),
       map: map,
@@ -397,9 +393,6 @@ async function handleSpotSelection(spotId: any) {
   }
 }
 
-
-
-
 async function fetchSpots() {
   if (!map) return
 
@@ -475,7 +468,7 @@ function drawMarkers(spotsData: BasicSpot[]) {
       content: `
         <div style="padding:15px; font-size:12px; max-width:500px;">
           <strong>${spot.title}</strong><br/>
-          타입: ${getTypeName(spot.contentTypeId)}<br/>
+          타입: ${getContentTypeName (spot.contentTypeId)}<br/>
           ${ratingDisplay ? `평점: ${ratingDisplay}<br/>` : ''}
           <a href="#" onclick="window.selectSpotById(${spot.no}); return false;" style="color:blue;text-decoration:underline;">상세정보 보기</a>
         </div>
@@ -531,7 +524,7 @@ function displaySearchResults(spotsData: BasicSpot[]) {
       content: `
         <div style="padding:5px; font-size:10px; max-width:350px;">
           <strong style="color: #dc2626;">[검색결과] ${spot.title}</strong><br/>
-          타입: ${getTypeName(spot.contentTypeId)}<br/>
+          타입: ${getContentTypeName (spot.contentTypeId)}<br/>
           ${ratingDisplay ? `평점: ${ratingDisplay}<br/>` : ''}
           <a href="#" onclick="window.selectSpotById(${spot.no}); return false;" style="color:blue;text-decoration:underline;">상세정보 보기</a>
         </div>
@@ -601,7 +594,7 @@ function moveToSpot(spot: BasicSpot) {
       content: `
         <div style="padding:5px; font-size:12px; max-width:500px;">
           <strong>${spot.title}</strong><br/>
-          타입: ${getTypeName(spot.contentTypeId)}<br/>
+          타입: ${getContentTypeName (spot.contentTypeId)}<br/>
           ${ratingDisplay ? `평점: ${ratingDisplay}<br/>` : ''}
           <a href="#" onclick="window.selectSpotById(${spot.no}); return false;" style="color:blue;text-decoration:underline;">상세정보 보기</a>
         </div>
@@ -645,7 +638,7 @@ async function handleSearch() {
     }
 
     // 검색어가 2글자 미만이면 검색하지 않음
-    if (keyword.length < 2) {
+    if (keyword.length < MAP_CONFIG.MIN_SEARCH_LENGTH) {
       return
     }
 
@@ -733,8 +726,8 @@ function startResizing(e: MouseEvent) {
 
 function resizeSidebar(e: MouseEvent) {
   if (!isResizing) return
-  const minWidth = 260
-  const maxWidth = 600
+  const minWidth = SIDEBAR_CONFIG.MIN_WIDTH
+  const maxWidth = SIDEBAR_CONFIG.MAX_WIDTH
   const newWidth = Math.min(Math.max(e.clientX, minWidth), maxWidth)
   sidebarWidth.value = newWidth
 }
@@ -748,10 +741,6 @@ function stopResizing() {
 // =====================================
 // 🛠️ 유틸리티 함수들 (Utility Functions)
 // =====================================
-
-function getTypeName(typeId: number): string {
-  return typeMap[typeId] || '기타'
-}
 
 onMounted(async () => {
   try {

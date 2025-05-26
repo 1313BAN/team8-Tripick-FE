@@ -22,17 +22,8 @@
 
 <script setup lang="ts">
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import type { RecommendationCardProps } from '@/types/spot';
 
-interface Destination {
-  id: number;
-  title: string;
-  tags: string[];
-  rating?: number;
-}
+defineProps<RecommendationCardProps>();
 
-interface Props {
-  destination: Destination;
-}
-
-defineProps<Props>();
 </script>

@@ -83,15 +83,11 @@
 
 <script setup lang="ts">
 import { Button } from '@/components/ui/button'
-import HashtagBadge from '@/components/HashtagBadge.vue'
-
-interface Tag {
-  id: string
-  name: string
-}
+import HashtagBadge from '@/components/feature/recommendation/HashtagBadge.vue'
+import type { IdNameItem } from '@/types'
 
 interface Props {
-  hashtags: Tag[]
+  hashtags: IdNameItem<string>[]
   selectedTags: string[]
   isLoading: boolean
   showResults: boolean

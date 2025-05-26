@@ -4,7 +4,7 @@
     <div class="mb-4">
       <div class="flex gap-2">
         <Button
-          v-for="gender in genders"
+          v-for="gender in GENDER_OPTIONS"
           :key="gender.value"
           :variant="selectedGender === gender.value ? 'default' : 'outline'"
           class="px-6 py-2"
@@ -19,7 +19,7 @@
     <div>
       <div class="flex flex-wrap gap-2">
         <Button
-          v-for="age in ageGroups"
+          v-for="age in AGE_GROUP_OPTIONS"
           :key="age.value"
           :variant="selectedAge === age.value ? 'default' : 'outline'"
           class="px-6 py-2"
@@ -34,6 +34,7 @@
 
 <script setup lang="ts">
 import { Button } from '@/components/ui/button';
+import { GENDER_OPTIONS, AGE_GROUP_OPTIONS } from '@/constants/filters'
 
 interface FilterData {
   gender: string | null;
@@ -50,20 +51,6 @@ const props = defineProps<Props>();
 const emit = defineEmits<{
   filterChange: [filterData: FilterData];
 }>();
-
-const genders = [
-  { value: 'male', label: '남자' },
-  { value: 'female', label: '여자' }
-];
-
-const ageGroups = [
-  { value: '10s', label: '10대' },
-  { value: '20s', label: '20대' },
-  { value: '30s', label: '30대' },
-  { value: '40s', label: '40대' },
-  { value: '50s', label: '50대' },
-  { value: '60s', label: '60대 이상' }
-];
 
 const selectGender = (gender: string) => {
   emit('filterChange', {

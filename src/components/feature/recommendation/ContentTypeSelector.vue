@@ -3,7 +3,7 @@
     <h3 class="text-lg font-semibold text-gray-800 mb-4">관광지 유형 선택</h3>
     <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
       <Button
-        v-for="contentType in contentTypes"
+        v-for="contentType in CONTENT_TYPES"
         :key="contentType.id"
         :variant="selectedContentType === contentType.id ? 'default' : 'outline'"
         :class="[
@@ -34,12 +34,7 @@
 
 <script setup lang="ts">
 import { Button } from '@/components/ui/button';
-
-interface ContentType {
-  id: number;
-  name: string;
-  icon: string;
-}
+import { CONTENT_TYPES } from '@/constants/contentTypes'
 
 interface Props {
   selectedContentType: number | null;
@@ -50,18 +45,6 @@ const props = defineProps<Props>();
 const emit = defineEmits<{
   contentTypeChange: [contentTypeId: number | null];
 }>();
-
-// 컨텐츠 타입 데이터 (이미지 기반으로 매핑)
-const contentTypes: ContentType[] = [
-  { id: 1, name: '자연관광지', icon: '🏔️' },
-  { id: 2, name: '역사 시설', icon: '🏛️' },
-  { id: 3, name: '공연,영화,전시', icon: '🎬' },
-  { id: 4, name: '상업 스팟', icon: '🏪' },
-  { id: 5, name: '레저, 스포츠', icon: '🏖️' },
-  { id: 6, name: '테마시설', icon: '🏯' },
-  { id: 7, name: '걷기 좋은 길', icon: '🚶' },
-  { id: 8, name: '지역 축제', icon: '🎪' }
-];
 
 const selectContentType = (contentTypeId: number) => {
   // 같은 버튼 클릭 시 토글 (선택 해제)

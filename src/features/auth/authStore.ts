@@ -1,10 +1,10 @@
 // src/features/auth/authStore.ts
 import { defineStore } from 'pinia'
-import axios from '@/api/axios'
+import axios from '@/api/authApi'
 import type { AuthResponse } from '@/types/auth'
-import type { UserDto } from '@/types/UserDto'
-import type { UserDetailDto } from '@/types/UserDetailDto'
-import type { UserUpdateDto } from '@/types/UserUpdateDto'
+import type { UserDto } from '@/types/user'
+import type { UserDetailDto } from '@/types/user'
+import type { UserUpdateDto } from '@/types/user'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({

@@ -60,7 +60,7 @@
                 :key="destination.id || destination.contentId"
                 class="pl-6 md:basis-1/2 lg:basis-1/3 xl:basis-1/4"
               >
-                <DestinationCard
+                <BasicRecommendationCard
                   :destination="destination"
                   @click="handleDestinationClick(destination)"
                 />
@@ -103,7 +103,7 @@
         <div class="mb-8">
           <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
             <button
-              v-for="(label, code) in motiveOptions"
+              v-for="(label, code) in MOTIVE_OPTIONS"
               :key="code"
               @click="selectMotive(Number(code))"
               :class="[
@@ -121,7 +121,7 @@
           <div v-if="selectedMotive" class="flex items-center gap-2">
             <span class="text-sm text-gray-600">선택된 동기:</span>
             <span class="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800">
-              {{ motiveOptions[selectedMotive] }}
+              {{ MOTIVE_OPTIONS[selectedMotive] }}
               <button @click="clearMotive" class="ml-2 text-blue-600 hover:text-blue-800">
                 ×
               </button>
@@ -162,7 +162,7 @@
                 :key="destination.id || destination.contentId"
                 class="pl-6 md:basis-1/2 lg:basis-1/3 xl:basis-1/4"
               >
-                <DestinationCard
+                <BasicRecommendationCard
                   :destination="destination"
                   @click="handleDestinationClick(destination)"
                 />
@@ -219,17 +219,18 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from '@/components/ui/carousel'
-import ContentTypeSelector from '@/components/ContentTypeSelector.vue'
-import FilterSection from '@/components/FilterSection.vue'
-import DestinationCard from '@/components/DestinationCard.vue'
+import ContentTypeSelector from '@/components/feature/recommendation/ContentTypeSelector.vue'
+import FilterSection from '@/components/feature/recommendation/FilterSection.vue'
+import BasicRecommendationCard from '@/components/feature/recommendation/BasicRecommendationCard.vue'
 import {
   getComplexRecommendations,
   type SpotRecommendationDTO,
   type FilterOptions,
-} from '@/api/destinations'
+} from '@/api/recommendationApi'
 import { useAuthStore } from '@/features/auth/authStore'
 
 import { useRouter } from 'vue-router'
+import {MOTIVE_OPTIONS} from '@/constants/recommendation'
 
 const router = useRouter()
 
@@ -251,19 +252,6 @@ interface Destination {
 interface FilterData {
   gender: string | null
   age: string | null
-}
-
-// 동기 옵션
-const motiveOptions: Record<number, string> = {
-  1: '일상적인 환경 탈출',
-  2: '휴식과 회복',
-  3: '유대감 증진',
-  4: '자아 찾기',
-  5: 'SNS 명소',
-  6: '건강 증진',
-  7: '새로운 경험',
-  8: '교육적 동기',
-  9: '특별한 행사'
 }
 
 // AuthStore 접근

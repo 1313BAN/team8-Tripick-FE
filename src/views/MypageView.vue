@@ -75,7 +75,7 @@
 <script setup lang="ts">
 import { useAuthStore } from '@/features/auth/authStore'
 import { ref, onMounted } from 'vue'
-import type { UserDetailDto } from '@/types/UserDetailDto'
+import type { UserDetailDto } from '@/types/user'
 
 const auth = useAuthStore()
 const user = ref<UserDetailDto | null>(null)

@@ -6,7 +6,7 @@
       <div>
         <h3 class="text-lg font-semibold">{{ spot.title }}</h3>
         <div class="flex gap-2 mt-1">
-          <span class="px-2 py-0.5 text-xs bg-blue-600 rounded">{{ getTypeName(spot.contentTypeId) }}</span>
+          <span class="px-2 py-0.5 text-xs bg-blue-600 rounded">{{ getContentTypeName(spot.contentTypeId) }}</span>
 
           <span class="text-yellow-400 text-sm">★ {{ spot.averageRating.toFixed(1) }}</span>
           <span class="text-gray-400 text-xs">({{ spot.reviewCount }}개 리뷰)</span>
@@ -22,7 +22,7 @@
       <div class="animate-pulse text-gray-400">상세 정보를 불러오는 중...</div>
     </div>
 
-    <!-- 상세 정보 -->
+    <!-- 평점 정보 -->
     <div v-else>
       <!-- 연령대별 평점 (상세 정보가 있을 때만 표시) -->
       <div v-if="hasDetailInfo" class="mb-4">
@@ -51,35 +51,34 @@
         </div>
       </div>
 
-      <!-- 인기 정보 (상세 정보가 있을 때만 표시) -->
-    <!-- 인기 정보 (상세 정보가 있을 때만 표시) -->
-<div v-if="hasDetailInfo" class="mb-3">
-  <div class="space-y-1.5">
-    <!-- 동행 타입 -->
-    <div class="flex items-center justify-between bg-gray-800/30 p-2 rounded-md border border-gray-700/30">
-      <div class="flex items-center gap-1.5">
-        <span class="text-gray-400 text-xs">👥</span>
-        <span class="text-gray-200 text-xs">주요 동행 타입</span>
+      <!-- 동행 타입, 여행 목적 등 세부 정보 -->
+    <div v-if="hasDetailInfo" class="mb-3">
+      <div class="space-y-1.5">
+        <!-- 동행 타입 -->
+        <div class="flex items-center justify-between bg-gray-800/30 p-2 rounded-md border border-gray-700/30">
+          <div class="flex items-center gap-1.5">
+            <span class="text-gray-400 text-xs">👥</span>
+            <span class="text-gray-200 text-xs">주요 동행 타입</span>
+          </div>
+          <span class="text-gray-200 text-xs font-medium">
+            {{ spot.mostPopularAccompanyType || '정보 없음' }}
+          </span>
+        </div>
+
+        <!-- 방문 목적 -->
+        <div class="flex items-center justify-between bg-gray-800/30 p-2 rounded-md border border-gray-700/30">
+          <div class="flex items-center gap-1.5">
+            <span class="text-gray-400 text-xs">🎯</span>
+            <span class="text-gray-200 text-xs">여행 목적</span>
+          </div>
+          <span class="text-gray-200 text-xs font-medium">
+            {{ spot.mostPopularMotive || '정보 없음' }}
+          </span>
+        </div>
       </div>
-      <span class="text-gray-200 text-xs font-medium">
-        {{ spot.mostPopularAccompanyType || '정보 없음' }}
-      </span>
     </div>
 
-    <!-- 방문 목적 -->
-    <div class="flex items-center justify-between bg-gray-800/30 p-2 rounded-md border border-gray-700/30">
-      <div class="flex items-center gap-1.5">
-        <span class="text-gray-400 text-xs">🎯</span>
-        <span class="text-gray-200 text-xs">여행 목적</span>
-      </div>
-      <span class="text-gray-200 text-xs font-medium">
-        {{ spot.mostPopularMotive || '정보 없음' }}
-      </span>
-    </div>
-  </div>
-</div>
-
-      <!-- 이미지 (기본 정보에는 없으므로 placeholder) -->
+      <!-- 이미지 (우선 제목으로 대체) -->
       <div class="mb-3 bg-gray-700 h-40 flex items-center justify-center rounded">
         <span class="text-gray-400">이미지 정보 없음</span>
       </div>
@@ -111,31 +110,10 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { getContentTypeName } from '@/constants/contentTypes';
+import type { SpotDetailProps } from '@/types/spot'
 
-// DetailSpot 타입 정의
-interface DetailSpot {
-  no: number
-  title: string
-  contentTypeId: number
-  latitude: number
-  longitude: number
-  averageRating: number
-  reviewCount: number
-  ageRatings?: {
-    twenties: number
-    thirties: number
-    forties: number
-    fifties: number
-    sixties: number
-  }
-  mostPopularAccompanyType?: string
-  mostPopularMotive?: string
-}
-
-const props = defineProps<{
-  spot: DetailSpot
-  isLoading?: boolean
-}>()
+const props = defineProps<SpotDetailProps>()
 
 const emit = defineEmits(['close', 'move-to-spot', 'refresh-detail'])
 
@@ -145,21 +123,6 @@ const hasDetailInfo = computed(() => {
          props.spot.mostPopularAccompanyType !== undefined &&
          props.spot.mostPopularMotive !== undefined
 })
-
-const typeMap: Record<number, string> = {
-  1: '자연관광지',
-  2: '역사시설',
-  3: '공연,영화,전시',
-  4: '상업스팟',
-  5: '레저스포츠',
-  6: '테마시설',
-  7: '산책',
-  8: '지역축제'
-}
-
-function getTypeName(typeId: number): string {
-  return typeMap[typeId] || '기타'
-}
 
 function moveToSpot() {
   emit('move-to-spot', props.spot)

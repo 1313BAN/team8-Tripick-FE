@@ -10,18 +10,15 @@
 
 <script setup lang="ts">
 import { Badge } from '@/components/ui/badge';
-
-interface Tag {
-  id: string;
-  name: string;
-}
+import type { IdNameItem} from '@/types/common';
 
 interface Props {
-  tag: Tag;
-  isSelected?: boolean;
+  tag: IdNameItem<string>
+  isSelected?: boolean
 }
 
 defineProps<Props>();
+
 defineEmits<{
   toggle: [tagId: string];
 }>();
