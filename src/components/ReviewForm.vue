@@ -60,8 +60,8 @@
           class="w-full px-3 py-2 bg-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
         <option value="">선택하세요</option>
-        <option v-for="code in Object.keys(motiveOptions)" :key="code" :value="code">
-          {{ motiveOptions[code] }}
+        <option v-for="[code, name] in Object.entries(motiveOptions)" :key="code" :value="code">
+          {{ name }}
         </option>
         </select>
       </div>
@@ -112,7 +112,7 @@ interface ReviewForm {
   rating: number
   title: string
   content: string
-  motiveCode: string
+  motiveCode: number | undefined
   comNum: number
 }
 
