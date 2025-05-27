@@ -12,7 +12,7 @@
             :key="spot.no"
             class="inline-block align-top bg-white p-4 rounded-lg shadow mr-4 w-fit text-left"
           >
-            <h2 class="text-xl font-semibold">{{ spot.title }}{{spot}}</h2>
+            <h2 class="text-xl font-semibold">{{ spot.title }}</h2>
             <p class="text-gray-500 text-sm">{{ spot.addr }} | {{ spot.type }}</p>
             <p class="text-sm mt-2">👉 {{ spot.reason }}</p>
 

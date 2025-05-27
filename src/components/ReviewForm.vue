@@ -48,7 +48,7 @@
         ></textarea>
         <div class="flex justify-between mt-1">
           <p v-if="errors.content" class="text-red-400 text-xs">{{ errors.content }}</p>
-          <p class="text-gray-400 text-xs">{{ form.content.length }}/1000</p>
+          <p class="text-gray-400 text-xs">{{ form.content.length }}/200</p>
         </div>
       </div>
 
@@ -59,10 +59,10 @@
           v-model="form.motiveCode"
           class="w-full px-3 py-2 bg-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
-          <option value="">선택하세요</option>
-          <option v-for="motive in motiveOptions" :key="motive.code" :value="motive.code">
-            {{ motive.name }}
-          </option>
+        <option value="">선택하세요</option>
+        <option v-for="code in Object.keys(motiveOptions)" :key="code" :value="code">
+          {{ motiveOptions[code] }}
+        </option>
         </select>
       </div>
 
@@ -105,7 +105,8 @@
 
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
-import StarRating from '@/components/StatRating.vue'
+import StarRating from '@/components/StarRating.vue'
+import { motiveOptions } from '@/constants/motiveOptions'
 
 interface ReviewForm {
   rating: number
@@ -136,18 +137,6 @@ const form = reactive<ReviewForm>({
   motiveCode: '',
   comNum: 1
 })
-
-// 여행 목적 옵션 (실제로는 백엔드에서 가져와야 할 수도 있습니다)
-const motiveOptions = [
-  { code: 1, name: '휴식/힐링' },
-  { code: 2, name: '관광/구경' },
-  { code: 3, name: '체험/액티비티' },
-  { code: 4, name: '맛집 탐방' },
-  { code: 5, name: '사진 촬영' },
-  { code: 6, name: '문화/역사 탐방' },
-  { code: 7, name: '쇼핑' },
-  { code: 8, name: '기타' }
-]
 
 const validateForm = (): boolean => {
   errors.value = {}
