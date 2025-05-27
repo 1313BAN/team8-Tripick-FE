@@ -15,20 +15,6 @@
     <!-- 인기 관광지 섹션 (필터 기능 포함) -->
     <PopularDestinationsSection />
 
-    <!-- TOP 여행지 섹션 -->
-    <div class="py-16 bg-gray-100">
-      <div class="container mx-auto px-4">
-        <h2 class="text-2xl font-bold mb-10 text-center">이주의 TOP 여행지</h2>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <TopDestinationCard
-            v-for="(topDest, index) in topDestinations"
-            :key="topDest.id"
-            :destination="topDest"
-            :rank="index + 1"
-          />
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -36,7 +22,6 @@
 import { ref } from 'vue'
 import HeroSection from '@/components/HeroSection.vue'
 import PopularDestinationsSection from '@/components/PopularDestinationsSection.vue'
-import TopDestinationCard from '@/components/TopDestinationCard.vue'
 import axios from '@/api/axios'
 
 // 선택된 해시태그를 관리하기 위한 상태

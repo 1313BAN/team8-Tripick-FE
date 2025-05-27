@@ -120,7 +120,7 @@ const motiveOptions: Record<number, string> = {
   2: '휴식과 회복',
   3: '유대감 증진',
   4: '자아 찾기',
-  5: 'SNS 과시',
+  5: 'SNS 명소',
   6: '건강 증진',
   7: '새로운 경험',
   8: '교육적 동기',

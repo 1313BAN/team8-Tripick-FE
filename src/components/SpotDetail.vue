@@ -1,4 +1,3 @@
-
 <template>
   <div class="bg-gray-800 p-4 rounded shadow text-white">
     <!-- 헤더 부분 -->
@@ -7,9 +6,8 @@
         <h3 class="text-lg font-semibold">{{ spot.title }}</h3>
         <div class="flex gap-2 mt-1">
           <span class="px-2 py-0.5 text-xs bg-blue-600 rounded">{{ getTypeName(spot.contentTypeId) }}</span>
-
           <span class="text-yellow-400 text-sm">★ {{ spot.averageRating.toFixed(1) }}</span>
-          <span class="text-gray-400 text-xs">({{ spot.reviewCount }}개 리뷰)</span>
+          <span class="text-gray-400 text-xs">({{ spot.reviewCount }}개)</span>
         </div>
       </div>
       <button @click="$emit('close')" class="text-gray-400 hover:text-white">
@@ -29,7 +27,7 @@
         <h4 class="text-gray-300 mb-2 font-medium text-sm">연령대별 평점</h4>
         <div class="grid grid-cols-5 gap-1 text-xs">
           <div class="text-center">
-            <div class="text-gray-400">20대 </div>
+            <div class="text-gray-400">20대</div>
             <div class="text-yellow-400">{{ (spot.ageRatings?.twenties && spot.ageRatings.twenties !== 0) ? spot.ageRatings.twenties.toFixed(1) :'없음' }}</div>
           </div>
           <div class="text-center">
@@ -52,32 +50,31 @@
       </div>
 
       <!-- 인기 정보 (상세 정보가 있을 때만 표시) -->
-    <!-- 인기 정보 (상세 정보가 있을 때만 표시) -->
-<div v-if="hasDetailInfo" class="mb-3">
-  <div class="space-y-1.5">
-    <!-- 동행 타입 -->
-    <div class="flex items-center justify-between bg-gray-800/30 p-2 rounded-md border border-gray-700/30">
-      <div class="flex items-center gap-1.5">
-        <span class="text-gray-400 text-xs">👥</span>
-        <span class="text-gray-200 text-xs">주요 동행 타입</span>
-      </div>
-      <span class="text-gray-200 text-xs font-medium">
-        {{ spot.mostPopularAccompanyType || '정보 없음' }}
-      </span>
-    </div>
+      <div v-if="hasDetailInfo" class="mb-3">
+        <div class="space-y-1.5">
+          <!-- 동행 타입 -->
+          <div class="flex items-center justify-between bg-gray-800/30 p-2 rounded-md border border-gray-700/30">
+            <div class="flex items-center gap-1.5">
+              <span class="text-gray-400 text-xs">👥</span>
+              <span class="text-gray-200 text-xs">주요 동행 타입</span>
+            </div>
+            <span class="text-gray-200 text-xs font-medium">
+              {{ spot.mostPopularAccompanyType || '정보 없음' }}
+            </span>
+          </div>
 
-    <!-- 방문 목적 -->
-    <div class="flex items-center justify-between bg-gray-800/30 p-2 rounded-md border border-gray-700/30">
-      <div class="flex items-center gap-1.5">
-        <span class="text-gray-400 text-xs">🎯</span>
-        <span class="text-gray-200 text-xs">여행 목적</span>
+          <!-- 방문 목적 -->
+          <div class="flex items-center justify-between bg-gray-800/30 p-2 rounded-md border border-gray-700/30">
+            <div class="flex items-center gap-1.5">
+              <span class="text-gray-400 text-xs">🎯</span>
+              <span class="text-gray-200 text-xs">여행 목적</span>
+            </div>
+            <span class="text-gray-200 text-xs font-medium">
+              {{ spot.mostPopularMotive || '정보 없음' }}
+            </span>
+          </div>
+        </div>
       </div>
-      <span class="text-gray-200 text-xs font-medium">
-        {{ spot.mostPopularMotive || '정보 없음' }}
-      </span>
-    </div>
-  </div>
-</div>
 
       <!-- 이미지 (기본 정보에는 없으므로 placeholder) -->
       <div class="mb-3 bg-gray-700 h-40 flex items-center justify-center rounded">
@@ -90,20 +87,33 @@
       </div>
 
       <!-- 버튼 -->
-      <div class="mt-4 flex justify-between">
+      <div class="mt-4 space-y-2">
+        <!-- 첫 번째 행: 리뷰 작성 버튼 -->
         <button
-          @click="moveToSpot"
-          class="bg-blue-600 text-white px-4 py-2 rounded text-xs hover:bg-blue-700"
+          v-if="authStore.isLoggedIn"
+          @click="$emit('write-review')"
+          class="w-full bg-yellow-600 text-white px-4 py-2 rounded text-sm hover:bg-yellow-700 transition-colors flex items-center justify-center gap-2"
         >
-          지도에서 보기
+          <span>⭐</span>
+          <span>별점 추가하기</span>
         </button>
-        <button
-          @click="refreshDetail"
-          class="bg-gray-700 text-white px-4 py-2 rounded text-xs hover:bg-gray-600"
-          :disabled="isLoading"
-        >
-          {{ isLoading ? '로딩중...' : '상세정보 새로고침' }}
-        </button>
+
+        <!-- 두 번째 행: 기존 버튼들 -->
+        <div class="flex justify-between gap-2">
+          <button
+            @click="moveToSpot"
+            class="flex-1 bg-blue-600 text-white px-4 py-2 rounded text-xs hover:bg-blue-700"
+          >
+            지도에서 보기
+          </button>
+          <button
+            @click="refreshDetail"
+            class="flex-1 bg-gray-700 text-white px-4 py-2 rounded text-xs hover:bg-gray-600"
+            :disabled="isLoading"
+          >
+            {{ isLoading ? '로딩중...' : '상세정보 새로고침' }}
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -111,6 +121,9 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useAuthStore } from '@/features/auth/authStore'
+
+const authStore = useAuthStore()
 
 // DetailSpot 타입 정의
 interface DetailSpot {
@@ -137,7 +150,7 @@ const props = defineProps<{
   isLoading?: boolean
 }>()
 
-const emit = defineEmits(['close', 'move-to-spot', 'refresh-detail'])
+const emit = defineEmits(['close', 'move-to-spot', 'refresh-detail', 'write-review'])
 
 // 상세 정보가 있는지 확인
 const hasDetailInfo = computed(() => {

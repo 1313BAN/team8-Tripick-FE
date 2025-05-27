@@ -12,7 +12,7 @@
             :key="spot.no"
             class="inline-block align-top bg-white p-4 rounded-lg shadow mr-4 w-fit text-left"
           >
-            <h2 class="text-xl font-semibold">{{ spot.title }}</h2>
+            <h2 class="text-xl font-semibold">{{ spot.title }}{{spot}}</h2>
             <p class="text-gray-500 text-sm">{{ spot.addr }} | {{ spot.type }}</p>
             <p class="text-sm mt-2">👉 {{ spot.reason }}</p>
 
@@ -44,7 +44,7 @@
       </div>
 
       <div v-else>
-        <p class="text-gray-600 mb-6">해시태그를 선택하여 관광지를 추천받아보세요</p>
+        <p class="text-gray-600 mb-6">해시태그를 선택하여 AI에게 관광지를 추천받아보세요</p>
 
         <!-- 연도 표시 -->
         <div class="text-8xl font-bold text-gray-200 opacity-30 my-6">2025</div>
