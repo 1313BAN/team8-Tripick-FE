@@ -228,8 +228,8 @@ import {
   type FilterOptions,
 } from '@/api/destinations'
 import { useAuthStore } from '@/features/auth/authStore'
-
 import { useRouter } from 'vue-router'
+
 
 const router = useRouter()
 
@@ -500,7 +500,6 @@ const resetFilters = (): void => {
 
 // 관광지 클릭 핸들러
 function  handleDestinationClick(spot: any) {
-  console.log("디버깅spot", spot)
   router.push({
     name: 'MapWithSpot',
     params: {

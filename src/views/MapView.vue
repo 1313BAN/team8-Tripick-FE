@@ -62,13 +62,25 @@
         </select>
       </div>
 
+      <!-- 🔥 리뷰 작성 폼 (새로 추가) -->
+      <div v-if="showReviewForm && selectedSpot" class="p-4">
+        <ReviewForm
+          :spot-id="selectedSpot.no"
+          :spot-title="selectedSpot.title"
+          @close="closeReviewForm"
+          @submit="handleReviewSubmit"
+        />
+      </div>
+
       <!-- 선택된 관광지 상세 정보 -->
-      <div v-if="selectedSpot && selectedSpotDetail" class="p-4">
+      <div v-else-if="selectedSpot && selectedSpotDetail" class="p-4">
         <SpotDetail
           :spot="selectedSpotDetail"
           :is-loading="isLoadingSpotDetail"
           @close="closeSpotDetail"
           @move-to-spot="moveToSpot"
+          @refresh-detail="refreshSpotDetail"
+          @write-review="openReviewForm"
         />
       </div>
 
@@ -127,6 +139,7 @@ import { onMounted, ref, computed, watch} from 'vue'
 import { onBeforeUnmount } from 'vue'
 import SpotCard from '@/components/SpotCard.vue'
 import SpotDetail from '@/components/SpotDetail.vue'
+import ReviewForm from '@/components/ReviewForm.vue' // 🔥 새로 추가
 import type { BasicSpot, DetailSpot } from '@/types/spot'
 import { typeMap } from '@/constants/SPOTTYPE'
 import axios from '@/api/axios'
@@ -137,6 +150,7 @@ import axios from '@/api/axios'
 const sidebarWidth = ref(360) // 사이드바 초기 너비
 const currentType = ref<number | null>(null)
 const sortOption = ref('rating')
+const showReviewForm = ref(false) // 🔥 리뷰 폼 표시 상태 추가
 
 // 로딩 상태
 const isLoadingLocation = ref(false)
@@ -180,6 +194,49 @@ const props = defineProps({
   }
 })
 
+// =====================================
+// 🔥 리뷰 관련 함수들 (새로 추가)
+// =====================================
+
+// 리뷰 작성 폼 열기
+const openReviewForm = () => {
+  showReviewForm.value = true
+}
+
+// 리뷰 작성 폼 닫기
+const closeReviewForm = () => {
+  showReviewForm.value = false
+}
+
+// 리뷰 제출 처리
+const handleReviewSubmit = async (reviewData: any) => {
+  try {
+    console.log('리뷰 데이터:', reviewData)
+
+    // 백엔드 API 호출
+    const response = await axios.post('/reviews', reviewData)
+
+    console.log('리뷰 등록 성공:', response.data)
+
+    // 성공 알림
+    alert('리뷰가 성공적으로 등록되었습니다!')
+
+    // 리뷰 폼 닫기
+    closeReviewForm()
+
+    // 관광지 상세 정보 새로고침 (평점이 업데이트될 수 있으므로)
+    if (selectedSpot.value) {
+      await refreshSpotDetail(selectedSpot.value.no)
+    }
+
+  } catch (error: any) {
+    console.error('리뷰 등록 실패:', error)
+
+    // 에러 메시지 표시
+    const errorMessage = error.response?.data?.message || '리뷰 등록에 실패했습니다.'
+    alert(errorMessage)
+  }
+}
 
 // =====================================
 // 🧮 계산된 속성 (Computed Properties)
@@ -235,7 +292,7 @@ const displaySpots = computed(() => {
 })
 
 // =====================================
-// 🚀
+// 🚀 와처 (Watchers)
 // =====================================
 watch(() => props.spotId, async (newSpotId) => {
   if (newSpotId && map) {
@@ -396,9 +453,6 @@ async function handleSpotSelection(spotId: any) {
     alert('해당 관광지를 찾을 수 없습니다.')
   }
 }
-
-
-
 
 async function fetchSpots() {
   if (!map) return
@@ -570,7 +624,7 @@ function adjustMapBounds(spots: BasicSpot[]) {
   setTimeout(() => {
     const currentLevel = map.getLevel()
     if (currentLevel < 2) {
-      // 최소 레벨 5로 제한
+      // 최소 레벨 2로 제한
       map.setLevel(2)
     }
   }, 100)
@@ -669,6 +723,7 @@ async function handleSearch() {
 function selectSpotBasic(spot: BasicSpot) {
   selectedSpot.value = spot
   selectedSpotDetail.value = null // 상세 정보 초기화
+  showReviewForm.value = false // 🔥 리뷰 폼 닫기
 }
 
 // 관광지 선택 시 상세 정보 로드
@@ -676,6 +731,7 @@ async function selectSpot(spot: BasicSpot) {
   selectedSpot.value = spot
   selectedSpotDetail.value = null
   isLoadingSpotDetail.value = true
+  showReviewForm.value = false // 🔥 리뷰 폼 닫기
 
   try {
     const res = await axios.get<DetailSpot>(`/spots/${spot.no}/detail`)
@@ -705,6 +761,23 @@ async function selectSpot(spot: BasicSpot) {
 function closeSpotDetail() {
   selectedSpot.value = null
   selectedSpotDetail.value = null
+  showReviewForm.value = false // 🔥 리뷰 폼도 닫기
+}
+
+// 🔥 상세 정보 새로고침 함수 (기존 refreshDetail에서 이름 변경)
+async function refreshSpotDetail(spotId: number) {
+  if (!selectedSpot.value) return
+
+  isLoadingSpotDetail.value = true
+
+  try {
+    const res = await axios.get<DetailSpot>(`/spots/${spotId}/detail`)
+    selectedSpotDetail.value = res.data
+  } catch (err) {
+    console.error('상세 정보 새로고침 실패:', err)
+  } finally {
+    isLoadingSpotDetail.value = false
+  }
 }
 
 // 🔥 changeType 함수 수정 (기존 코드에 추가)
@@ -712,6 +785,7 @@ function changeType(type: number | null) {
   currentType.value = type
   selectedSpot.value = null
   selectedSpotDetail.value = null
+  showReviewForm.value = false // 🔥 리뷰 폼 닫기
 
   // 타입 변경 시 검색어가 있으면 다시 검색, 없으면 지도 새로고침
   if (searchKeyword.value?.trim()) {

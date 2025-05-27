@@ -44,7 +44,7 @@
       </div>
 
       <div v-else>
-        <p class="text-gray-600 mb-6">해시태그를 선택하여 관광지를 추천받아보세요</p>
+        <p class="text-gray-600 mb-6">해시태그를 선택하여 AI에게 관광지를 추천받아보세요</p>
 
         <!-- 연도 표시 -->
         <div class="text-8xl font-bold text-gray-200 opacity-30 my-6">2025</div>
