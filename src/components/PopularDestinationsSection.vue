@@ -95,9 +95,7 @@
 
       <!-- 두 번째 카테고리: 동기 기반 추천 -->
       <div class="mb-16 bg-white rounded-2xl p-8 shadow-lg border border-gray-200">
-        <h2 class="text-2xl font-bold mb-6 text-left text-gray-800">
-          동기 기반 추천 관광지
-        </h2>
+        <h2 class="text-2xl font-bold mb-6 text-left text-gray-800">동기 기반 추천 관광지</h2>
 
         <!-- 동기 선택 필터 -->
         <div class="mb-8">
@@ -109,8 +107,8 @@
               :class="[
                 'p-3 rounded-lg border-2 text-sm font-medium transition-all duration-200',
                 selectedMotive === Number(code)
-                  ? 'border-blue-500 bg-blue-50 text-blue-700'
-                  : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                  ? 'border-black bg-black text-white'
+                  : 'border-gray-200 bg-white text-gray-700 hover:border-gray-800 hover:bg-gray-100',
               ]"
             >
               {{ label }}
@@ -120,11 +118,11 @@
           <!-- 선택된 동기 표시 -->
           <div v-if="selectedMotive" class="flex items-center gap-2">
             <span class="text-sm text-gray-600">선택된 동기:</span>
-            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800">
+            <span
+              class="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800"
+            >
               {{ motiveOptions[selectedMotive] }}
-              <button @click="clearMotive" class="ml-2 text-blue-600 hover:text-blue-800">
-                ×
-              </button>
+              <button @click="clearMotive" class="ml-2 text-blue-600 hover:text-blue-800">×</button>
             </span>
           </div>
         </div>
@@ -230,9 +228,7 @@ import {
 import { useAuthStore } from '@/features/auth/authStore'
 import { useRouter } from 'vue-router'
 
-
 const router = useRouter()
-
 
 interface Destination {
   id: number
@@ -246,9 +242,9 @@ interface Destination {
   firstImage?: string
   mapX?: number
   mapY?: number
-  contentTypeId: number,         // 추가 정보
-  contentTypeName: string,     // 추가 정보
-  reviewCount: number,
+  contentTypeId: number // 추가 정보
+  contentTypeName: string // 추가 정보
+  reviewCount: number
 }
 
 interface FilterData {
@@ -266,7 +262,7 @@ const motiveOptions: Record<number, string> = {
   6: '건강 증진',
   7: '새로운 경험',
   8: '교육적 동기',
-  9: '특별한 행사'
+  9: '특별한 행사',
 }
 
 // AuthStore 접근
@@ -410,20 +406,20 @@ const clearMotive = (): void => {
 
 // 백엔드 응답을 프론트엔드 형식으로 변환
 const convertToDestination = (item: SpotRecommendationDTO): Destination => ({
-  id: item.no ?? 0,                          // no 필드 사용
-  contentId: item.no,                        // no 필드 사용
+  id: item.no ?? 0, // no 필드 사용
+  contentId: item.no, // no 필드 사용
   title: item.title || '제목 없음',
-  tags: item.tags || [item.contentTypeName] || [],                     // tags가 없다면 contentTypeName을 태그로 사용
-  image: item.firstImage1,                   // firstImage1 필드 사용
-  rating: item.avgRating,                    // avgRating 필드 사용
-  location: item.addr,                       // addr 필드 사용
-  addr1: item.addr,                          // addr 필드 사용
-  firstImage: item.firstImage1,              // firstImage1 필드 사용
-  mapX: item.longitude,                      // longitude 필드 사용
-  mapY: item.latitude,                       // latitude 필드 사용
-  contentTypeId: item.contentTypeId,         // 추가 정보
-  contentTypeName: item.contentTypeName,     // 추가 정보
-  reviewCount: item.reviewCount,             // 리뷰 개수 추가
+  tags: item.tags || [item.contentTypeName] || [], // tags가 없다면 contentTypeName을 태그로 사용
+  image: item.firstImage1, // firstImage1 필드 사용
+  rating: item.avgRating, // avgRating 필드 사용
+  location: item.addr, // addr 필드 사용
+  addr1: item.addr, // addr 필드 사용
+  firstImage: item.firstImage1, // firstImage1 필드 사용
+  mapX: item.longitude, // longitude 필드 사용
+  mapY: item.latitude, // latitude 필드 사용
+  contentTypeId: item.contentTypeId, // 추가 정보
+  contentTypeName: item.contentTypeName, // 추가 정보
+  reviewCount: item.reviewCount, // 리뷰 개수 추가
 })
 
 // 성별, 연령대 기반 API 호출 함수
@@ -501,12 +497,12 @@ const resetFilters = (): void => {
 }
 
 // 관광지 클릭 핸들러
-function  handleDestinationClick(spot: any) {
+function handleDestinationClick(spot: any) {
   router.push({
     name: 'MapWithSpot',
     params: {
-      spotId: spot.id
-    }
+      spotId: spot.id,
+    },
   })
   // 결과 URL: /map/spot/123
 }

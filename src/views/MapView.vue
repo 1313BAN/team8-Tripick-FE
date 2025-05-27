@@ -63,7 +63,7 @@
       </div>
 
       <!-- 🔥 리뷰 작성 폼 (새로 추가) -->
-      <div v-if="showReviewForm && selectedSpot" class="p-4">
+      <div v-if="showReviewForm && selectedSpot " class="p-4">
         <ReviewForm
           :spot-id="selectedSpot.no"
           :spot-title="selectedSpot.title"
@@ -171,6 +171,8 @@ const currentLocation = ref<{ lat: number; lng: number } | null>(null)
 // 검색 관련
 const searchKeyword = ref('')
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
+  // 🔥 검색 상태 추가 (기존 변수들 근처에 추가)
+const isInSearchMode = ref(false) // 검색 모드 상태 추가
 
 // 지도 관련 변수
 let map: kakao.maps.Map
@@ -457,6 +459,9 @@ async function handleSpotSelection(spotId: any) {
 async function fetchSpots() {
   if (!map) return
 
+  // 🔥 검색 모드일 때는 자동으로 마커를 그리지 않음
+  if (isInSearchMode.value) return
+
   const bounds = map.getBounds()
   const sw = bounds.getSouthWest()
   const ne = bounds.getNorthEast()
@@ -559,7 +564,7 @@ function drawMarkers(spotsData: BasicSpot[]) {
   }
 }
 
-// 🔥 검색 결과를 지도에 표시하는 함수
+// 🔥 검색 결과를 지도에 표시하는 함수 (마커 색깔 변경)
 function displaySearchResults(spotsData: BasicSpot[]) {
   clearSearchMarkers()
 
@@ -570,12 +575,26 @@ function displaySearchResults(spotsData: BasicSpot[]) {
 
   searchResults.value = spotsData
 
+  // 🔥 SVG로 파란색 마커 직접 생성
+  const blueSvg = `
+    <svg width="24" height="35" viewBox="0 0 24 35" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 23 12 23s12-14 12-23c0-6.6-5.4-12-12-12z" fill="#dc2626"/>
+      <circle cx="12" cy="12" r="6" fill="#ffffff"/>
+    </svg>
+  `
+
+  const searchMarkerImage = new kakao.maps.MarkerImage(
+    `data:image/svg+xml;base64,${btoa(blueSvg)}`,
+    new kakao.maps.Size(24, 35)
+  )
+
   spotsData.forEach((spot) => {
     const position = new kakao.maps.LatLng(spot.latitude, spot.longitude)
     const marker = new kakao.maps.Marker({
       position,
       map,
       title: spot.title,
+      image: searchMarkerImage // 🔥 파란색 마커 이미지 적용
     })
 
     const ratingDisplay =
@@ -584,7 +603,7 @@ function displaySearchResults(spotsData: BasicSpot[]) {
     const detailInfo = new kakao.maps.InfoWindow({
       content: `
         <div style="padding:5px; font-size:10px; max-width:350px;">
-          <strong style="color: #dc2626;">[검색결과] ${spot.title}</strong><br/>
+          <strong style="color: #2563eb;">[검색결과] ${spot.title}</strong><br/>
           타입: ${getTypeName(spot.contentTypeId)}<br/>
           ${ratingDisplay ? `평점: ${ratingDisplay}<br/>` : ''}
           <a href="#" onclick="window.selectSpotById(${spot.no}); return false;" style="color:blue;text-decoration:underline;">상세정보 보기</a>
@@ -693,8 +712,12 @@ async function handleSearch() {
 
     // 검색어가 없으면 검색 결과 초기화
     if (!keyword) {
+      isInSearchMode.value = false // 🔥 검색 모드 해제
       clearSearchMarkers()
       searchResults.value = []
+
+      // 🔥 검색어가 없으면 기존 지도 범위 내 마커들 다시 표시
+      fetchSpots()
       return
     }
 
@@ -704,6 +727,11 @@ async function handleSearch() {
     }
 
     try {
+      // 🔥 검색 모드 활성화 및 기존 마커들 숨기기
+      isInSearchMode.value = true
+      // 🔥 검색 시 기존 마커들 숨기기 (이 부분이 빠져있었음!)
+      clearMarkers()
+
       // DB에서 검색 실행 (현재 선택된 타입 적용)
       const results = await searchSpotsFromDB(keyword, currentType.value)
 
@@ -780,17 +808,21 @@ async function refreshSpotDetail(spotId: number) {
   }
 }
 
-// 🔥 changeType 함수 수정 (기존 코드에 추가)
+// 🔥 changeType 함수 수정
 function changeType(type: number | null) {
   currentType.value = type
   selectedSpot.value = null
   selectedSpotDetail.value = null
-  showReviewForm.value = false // 🔥 리뷰 폼 닫기
+  showReviewForm.value = false
 
   // 타입 변경 시 검색어가 있으면 다시 검색, 없으면 지도 새로고침
   if (searchKeyword.value?.trim()) {
-    handleSearch() // 새로운 타입으로 다시 검색
+    handleSearch() // 새로운 타입으로 다시 검색 (기존 마커는 숨겨짐)
   } else {
+    // 🔥 검색어가 없을 때는 검색 마커들을 지우고 기존 마커들만 표시
+    isInSearchMode.value = false
+    clearSearchMarkers()
+    searchResults.value = []
     fetchSpots() // 지도 범위 내 관광지 다시 로드
   }
 }
