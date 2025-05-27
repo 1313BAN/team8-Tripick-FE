@@ -134,7 +134,7 @@ const form = reactive<ReviewForm>({
   rating: 0,
   title: '',
   content: '',
-  motiveCode: '',
+  motiveCode: 0,
   comNum: 1
 })
 
@@ -195,7 +195,7 @@ const resetForm = () => {
   form.rating = 0
   form.title = ''
   form.content = ''
-  form.motiveCode = ''
+  form.motiveCode = 0
   form.comNum = 1
   errors.value = {}
 }
