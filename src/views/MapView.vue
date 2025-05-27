@@ -135,7 +135,7 @@
 
 <script setup lang="ts">
 import { loadKakaoMap } from '@/utils/loadKakaoMap'
-import { onMounted, ref, computed, watch} from 'vue'
+import { onMounted, ref, computed, watch } from 'vue'
 import { onBeforeUnmount } from 'vue'
 import SpotCard from '@/components/SpotCard.vue'
 import SpotDetail from '@/components/SpotDetail.vue'
@@ -190,8 +190,8 @@ const DEFAULT_LEVEL = 7
 const props = defineProps({
   spotId: {
     type: String, // URL params는 항상 string
-    default: null
-  }
+    default: null,
+  },
 })
 
 // =====================================
@@ -228,7 +228,6 @@ const handleReviewSubmit = async (reviewData: any) => {
     if (selectedSpot.value) {
       await refreshSpotDetail(selectedSpot.value.no)
     }
-
   } catch (error: any) {
     console.error('리뷰 등록 실패:', error)
 
@@ -294,12 +293,16 @@ const displaySpots = computed(() => {
 // =====================================
 // 🚀 와처 (Watchers)
 // =====================================
-watch(() => props.spotId, async (newSpotId) => {
-  if (newSpotId && map) {
-    console.log('🎯 새로운 관광지 ID:', newSpotId)
-    await handleSpotSelection(Number(newSpotId))
-  }
-}, { immediate: true })
+watch(
+  () => props.spotId,
+  async (newSpotId) => {
+    if (newSpotId && map) {
+      console.log('🎯 새로운 관광지 ID:', newSpotId)
+      await handleSpotSelection(Number(newSpotId))
+    }
+  },
+  { immediate: true },
+)
 
 // =====================================
 // 🚀 초기화 함수들 (Initialization)
@@ -378,7 +381,7 @@ async function initializeMap() {
   kakao.maps.event.addListener(map, 'idle', fetchSpots)
   fetchSpots()
 
-   if (props.spotId) {
+  if (props.spotId) {
     await handleSpotSelection(Number(props.spotId))
   }
 }
@@ -447,7 +450,6 @@ async function handleSpotSelection(spotId: any) {
     await selectSpot(spotData)
 
     console.log('✅ 관광지 자동 선택 완료:', spotData.title)
-
   } catch (error) {
     console.error('관광지 선택 실패:', error)
     alert('해당 관광지를 찾을 수 없습니다.')
@@ -705,6 +707,7 @@ async function handleSearch() {
 
     try {
       // DB에서 검색 실행 (현재 선택된 타입 적용)
+      clearMarkers()
       const results = await searchSpotsFromDB(keyword, currentType.value)
 
       // 검색 결과를 지도에 표시
@@ -791,6 +794,8 @@ function changeType(type: number | null) {
   if (searchKeyword.value?.trim()) {
     handleSearch() // 새로운 타입으로 다시 검색
   } else {
+    clearSearchMarkers()
+    searchResults.value = []
     fetchSpots() // 지도 범위 내 관광지 다시 로드
   }
 }
