@@ -246,6 +246,9 @@ interface Destination {
   firstImage?: string
   mapX?: number
   mapY?: number
+  contentTypeId: number,         // 추가 정보
+  contentTypeName: string,     // 추가 정보
+  reviewCount: number,
 }
 
 interface FilterData {
@@ -421,7 +424,6 @@ const convertToDestination = (item: SpotRecommendationDTO): Destination => ({
   contentTypeId: item.contentTypeId,         // 추가 정보
   contentTypeName: item.contentTypeName,     // 추가 정보
   reviewCount: item.reviewCount,             // 리뷰 개수 추가
-  overview: item.overview,                   // 개요 추가
 })
 
 // 성별, 연령대 기반 API 호출 함수
